@@ -240,6 +240,12 @@ body{
 .bt-col-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
 .bt-title{font-family:var(--font-display); font-weight:700; font-size:15px; display:flex; align-items:center; gap:8px;}
 .bt-title-dot{width:9px;height:9px;border-radius:3px;}
+.bt-area-group{margin-bottom:16px;}
+.bt-area-head{display:flex; align-items:center; justify-content:space-between; font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:var(--text-faint); padding:0 2px 8px; border-bottom:1px solid var(--border-soft); margin-bottom:10px;}
+.gantt-summary-card{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); margin-bottom:18px; padding:16px 16px 10px; box-shadow:var(--shadow-card);}
+.gantt-summary-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:8px;}
+.gantt-summary-title{font-family:var(--font-display); font-weight:700; font-size:15px;}
+.gantt-summary-note{font-size:11.5px; color:var(--text-faint);}
 
 /* ---------- MODAL ---------- */
 .modal-overlay{
@@ -456,7 +462,15 @@ body{
   <!-- ================= BOUTIQUE ================= -->
   <section class="view" id="view-boutique">
     <div class="toolbar">
-      <div style="font-size:13px; color:var(--text-dim);">Pedidos internos de boutique y reclamos, por separado</div>
+      <div style="font-size:13px; color:var(--text-dim);">Pedidos internos de boutique y reclamos, agrupados por área</div>
+      <input class="search-box" id="btSearch" placeholder="Buscar operación…">
+    </div>
+    <div class="gantt-summary-card">
+      <div class="gantt-summary-head">
+        <span class="gantt-summary-title">📊 Seguimiento general</span>
+        <span class="gantt-summary-note">Ordenado por fecha de inicio</span>
+      </div>
+      <div id="boutiqueGanttWrap"></div>
     </div>
     <div class="boutique-grid">
       <div>
@@ -950,10 +964,10 @@ function bindTaskReorder(wrap){
   });
 }
 
-function ganttHTML(p){
-  if(p.tasks.length===0) return '';
-  const starts = p.tasks.map(t=>new Date(t.start||todayISO()));
-  const ends = p.tasks.map(t=>new Date(t.end||t.start||todayISO()));
+function computeGanttHTML(rows){
+  // rows: [{label, start, end, barColor}]
+  const starts = rows.map(r=>new Date(r.start));
+  const ends = rows.map(r=>new Date(r.end));
   let min = new Date(Math.min(...starts));
   let max = new Date(Math.max(...ends));
   min.setDate(min.getDate()-2); max.setDate(max.getDate()+2);
@@ -968,17 +982,15 @@ function ganttHTML(p){
     months.push({label: cursor.toLocaleDateString('es-AR',{month:'short'}).replace('.',''), pct});
     cursor.setMonth(cursor.getMonth()+1);
   }
-  const hex = COLOR_HEX[p.color] || COLOR_HEX.amber;
 
-  const rows = p.tasks.map(t=>{
-    const s = new Date(t.start||todayISO()), e = new Date(t.end||t.start||todayISO());
+  const rowsHTML = rows.map(r=>{
+    const s = new Date(r.start), e = new Date(r.end);
     const left = Math.max(0,((s-min)/86400000)/span*100);
     const width = Math.max(1.5, ((e-s)/86400000)/span*100);
-    const barColor = t.status==='completado' ? COLOR_HEX.teal : (t.status==='progreso'? hex : '#D9D2BE');
     return `<div class="gantt-row">
-      <div class="gantt-label" title="${escapeHTML(t.title)}">${escapeHTML(t.title)}</div>
+      <div class="gantt-label" title="${escapeHTML(r.label)}">${escapeHTML(r.label)}</div>
       <div class="gantt-track">
-        <div class="gantt-bar" style="left:${left}%; width:${width}%; background:${barColor};"></div>
+        <div class="gantt-bar" style="left:${left}%; width:${width}%; background:${r.barColor};"></div>
       </div>
     </div>`;
   }).join('');
@@ -992,23 +1004,84 @@ function ganttHTML(p){
     </div>
     <div style="position:relative;">
       <div class="gantt-today" style="left:calc(150px + (100% - 150px) * ${todayPct/100});"></div>
-      ${rows}
+      ${rowsHTML}
     </div>
   </div></div>`;
+}
+
+function ganttHTML(p){
+  if(p.tasks.length===0) return '';
+  const hex = COLOR_HEX[p.color] || COLOR_HEX.amber;
+  const rows = p.tasks.map(t=>({
+    label: t.title,
+    start: t.start||todayISO(),
+    end: t.end||t.start||todayISO(),
+    barColor: t.status==='completado' ? COLOR_HEX.teal : (t.status==='progreso'? hex : '#D9D2BE')
+  }));
+  return computeGanttHTML(rows);
 }
 
 /* ============================================================
    RENDER: BOUTIQUE
 ============================================================ */
+let btSearchTerm = '';
+
+function renderBoutiqueGantt(items){
+  const wrap = document.getElementById('boutiqueGanttWrap');
+  if(items.length===0){
+    wrap.innerHTML = `<div class="empty-state">Sin operaciones para mostrar</div>`;
+    return;
+  }
+  const withDates = items.filter(b=>b.start && b.end);
+  if(withDates.length===0){
+    wrap.innerHTML = `<div class="empty-state">Ninguna operación tiene fecha de inicio y fin cargada todavía</div>`;
+    return;
+  }
+  const sorted = withDates.slice().sort((a,b)=> (a.start||'').localeCompare(b.start||''));
+  const rows = sorted.map(b=>{
+    const baseHex = COLOR_HEX[b.tipo==='pedido' ? 'blue' : 'rose'];
+    return {
+      label: `${b.title}${b.area?` — ${b.area}`:''}`,
+      start: b.start,
+      end: b.end,
+      barColor: b.status==='completado' ? COLOR_HEX.teal : (b.status==='progreso' ? baseHex : '#D9D2BE')
+    };
+  });
+  const missing = items.length - withDates.length;
+  wrap.innerHTML = computeGanttHTML(rows) + (missing>0 ? `<div class="gantt-summary-note" style="margin-top:8px;">⚠ ${missing} operación(es) sin fecha cargada no se muestran acá</div>` : '');
+}
+
 function renderBoutique(){
+  const search = btSearchTerm.trim().toLowerCase();
+  const matches = b => !search || [b.title,b.responsible,b.area,b.notas,b.rda,b.solped,b.hes].some(v=>(v||'').toLowerCase().includes(search));
+  const filtered = DATA.boutique.filter(matches);
+
+  renderBoutiqueGantt(filtered);
+
   ['pedido','reclamo'].forEach(tipo=>{
     const col = document.getElementById('bt-'+tipo);
-    const list = DATA.boutique.filter(b=>b.tipo===tipo).sort((a,b)=> (a.status==='completado'?1:0) - (b.status==='completado'?1:0));
+    const list = filtered.filter(b=>b.tipo===tipo);
     if(list.length===0){
-      col.innerHTML = `<div class="empty-state">Nada cargado todavía</div>`;
-    } else {
-      col.innerHTML = list.map(b=>cardHTML({...b, kind:tipo, color: tipo==='pedido'?'blue':'rose'})).join('');
+      col.innerHTML = `<div class="empty-state">${search ? 'Sin resultados para tu búsqueda' : 'Nada cargado todavía'}</div>`;
+      return;
     }
+    const groups = {};
+    list.forEach(b=>{
+      const key = (b.area||'').trim() || 'Sin área';
+      (groups[key] = groups[key] || []).push(b);
+    });
+    const areaNames = Object.keys(groups).sort((a,b)=>{
+      if(a==='Sin área') return 1;
+      if(b==='Sin área') return -1;
+      return a.localeCompare(b,'es');
+    });
+    col.innerHTML = areaNames.map(area=>{
+      const items = groups[area].slice().sort((a,b)=> (a.status==='completado'?1:0) - (b.status==='completado'?1:0));
+      return `<div class="bt-area-group">
+        <div class="bt-area-head"><span>${escapeHTML(area)}</span><span class="tab-count">${items.length}</span></div>
+        <div class="bt-area-items">${items.map(b=>cardHTML({...b, kind:tipo, color: tipo==='pedido'?'blue':'rose'})).join('')}</div>
+      </div>`;
+    }).join('');
   });
   document.getElementById('cntBou').textContent = DATA.boutique.filter(b=>b.status!=='completado').length;
   bindCardEvents('#view-boutique');
@@ -1745,6 +1818,7 @@ document.querySelectorAll('#hoyFilters .chip').forEach(chip=>{
   });
 });
 document.getElementById('hoySearch').addEventListener('input', e=>{ hoySearch = e.target.value; renderHoy(); });
+document.getElementById('btSearch').addEventListener('input', e=>{ btSearchTerm = e.target.value; renderBoutique(); });
 document.getElementById('btnQuickAdd').addEventListener('click', openQuickAddModal);
 document.getElementById('btnNewProject').addEventListener('click', ()=> openProjectModal(null));
 document.getElementById('btnExport').addEventListener('click', exportExcel);
