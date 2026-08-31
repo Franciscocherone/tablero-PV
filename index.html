@@ -186,6 +186,11 @@ body{
 }
 .proj-head:hover{background:rgba(255,255,255,.015);}
 .proj-title-wrap{display:flex; align-items:center; gap:10px; min-width:0;}
+.proj-drag-handle{color:var(--text-faint); cursor:grab; font-size:14px; letter-spacing:-1px; user-select:none; flex-shrink:0;}
+.proj-drag-handle:active{cursor:grabbing;}
+.proj-card.row-dragging{opacity:.4;}
+.proj-card.drop-before{box-shadow:inset 0 2px 0 0 var(--amber);}
+.proj-card.drop-after{box-shadow:inset 0 -2px 0 0 var(--amber);}
 .proj-dot{width:9px;height:9px;border-radius:3px; flex-shrink:0;}
 .proj-name{font-family:var(--font-display); font-weight:700; font-size:15px;}
 .proj-stats{display:flex; align-items:center; gap:14px; font-family:var(--font-mono); font-size:11.5px; color:var(--text-dim);}
@@ -204,6 +209,8 @@ body{
 .gantt-track{flex:1; position:relative; height:16px; background:var(--panel-2); border-radius:5px;}
 .gantt-bar{position:absolute; top:0; height:100%; border-radius:5px; min-width:5px;}
 .gantt-today{position:absolute; top:-6px; bottom:-6px; width:2px; background:var(--amber); box-shadow:0 0 6px var(--amber-glow); z-index:5;}
+.gantt-row-clickable{cursor:pointer;}
+.gantt-row-clickable:hover .gantt-label{color:var(--amber);}
 
 .task-table{width:100%; border-collapse:collapse; margin-top:6px;}
 .task-table th{
@@ -455,6 +462,13 @@ body{
         <button class="btn" id="btnExport">⬇ Exportar a Excel</button>
         <button class="btn btn-primary" id="btnNewProject">+ Nuevo proyecto</button>
       </div>
+    </div>
+    <div class="gantt-summary-card">
+      <div class="gantt-summary-head">
+        <span class="gantt-summary-title">📊 Seguimiento general</span>
+        <span class="gantt-summary-note">Un proyecto por fila — tocá una barra para ir al detalle. Arrastrá las tarjetas de abajo para reordenarlas.</span>
+      </div>
+      <div id="projectsGanttWrap"></div>
     </div>
     <div id="projectsList"></div>
   </section>
@@ -846,9 +860,47 @@ function setStatus(ref, newStatus){
 ============================================================ */
 let openProjects = new Set();
 
+function renderProjectsGanttOverview(){
+  const wrap = document.getElementById('projectsGanttWrap');
+  const withTasks = DATA.projects.filter(p=>p.tasks.length>0);
+  if(withTasks.length===0){
+    wrap.innerHTML = `<div class="empty-state">Todavía no hay proyectos con tareas cargadas</div>`;
+    return;
+  }
+  const rows = withTasks.map(p=>{
+    const starts = p.tasks.map(t=>new Date(t.start||todayISO()));
+    const ends = p.tasks.map(t=>new Date(t.end||t.start||todayISO()));
+    const total = p.tasks.length;
+    const done = p.tasks.filter(t=>t.status==='completado').length;
+    const pct = total ? Math.round(done/total*100) : 0;
+    const hasProgress = p.tasks.some(t=>t.status!=='pendiente');
+    const hex = COLOR_HEX[p.color] || COLOR_HEX.amber;
+    return {
+      key: p.id,
+      label: `${p.name} — ${pct}%`,
+      start: new Date(Math.min(...starts)).toISOString().slice(0,10),
+      end: new Date(Math.max(...ends)).toISOString().slice(0,10),
+      barColor: pct===100 ? COLOR_HEX.teal : (hasProgress ? hex : '#D9D2BE')
+    };
+  });
+  wrap.innerHTML = computeGanttHTML(rows);
+  wrap.querySelectorAll('[data-gantt-row]').forEach(row=>{
+    row.addEventListener('click', ()=>{
+      const id = row.dataset.ganttRow;
+      openProjects.add(id);
+      renderProyectos();
+      requestAnimationFrame(()=>{
+        const card = document.querySelector(`.proj-card[data-project="${id}"]`);
+        if(card) card.scrollIntoView({behavior:'smooth', block:'start'});
+      });
+    });
+  });
+}
+
 function renderProyectos(){
   const wrap = document.getElementById('projectsList');
   document.getElementById('cntProy').textContent = DATA.projects.reduce((a,p)=>a+p.tasks.filter(t=>t.status!=='completado').length,0);
+  renderProjectsGanttOverview();
   if(DATA.projects.length===0){
     wrap.innerHTML = `<div class="empty-state">Todavía no tenés proyectos. Creá el primero con "+ Nuevo proyecto".</div>`;
     return;
@@ -860,9 +912,10 @@ function renderProyectos(){
     const hex = COLOR_HEX[p.color] || COLOR_HEX.amber;
     const isOpen = openProjects.has(p.id);
     return `
-    <div class="proj-card ${isOpen?'open':''}" data-project="${p.id}">
+    <div class="proj-card ${isOpen?'open':''}" data-project="${p.id}" draggable="true">
       <div class="proj-head" data-toggle="${p.id}">
         <div class="proj-title-wrap">
+          <span class="proj-drag-handle" title="Arrastrá para reordenar">⠿</span>
           <span class="proj-dot" style="background:${hex};"></span>
           <span class="proj-name">${escapeHTML(p.name)}</span>
         </div>
@@ -901,6 +954,7 @@ function renderProyectos(){
   wrap.querySelectorAll('[data-toggle]').forEach(el=>{
     el.addEventListener('click', e=>{
       if(e.target.closest('[data-editproject]')) return;
+      if(e.target.closest('.proj-drag-handle')) return;
       const id = el.dataset.toggle;
       if(openProjects.has(id)) openProjects.delete(id); else openProjects.add(id);
       renderProyectos();
@@ -919,6 +973,47 @@ function renderProyectos(){
     });
   });
   bindTaskReorder(wrap);
+  bindProjectReorder(wrap);
+}
+
+function bindProjectReorder(wrap){
+  let dragProjectId = null;
+  wrap.querySelectorAll('.proj-card').forEach(card=>{
+    card.addEventListener('dragstart', e=>{
+      dragProjectId = card.dataset.project;
+      card.classList.add('row-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      try{ e.dataTransfer.setData('text/plain', dragProjectId); }catch(err){}
+    });
+    card.addEventListener('dragend', ()=>{
+      dragProjectId = null;
+      card.classList.remove('row-dragging');
+      wrap.querySelectorAll('.proj-card').forEach(c=> c.classList.remove('drop-before','drop-after'));
+    });
+    card.addEventListener('dragover', e=>{
+      if(!dragProjectId || card.dataset.project === dragProjectId) return;
+      e.preventDefault();
+      const rect = card.getBoundingClientRect();
+      const before = (e.clientY - rect.top) < rect.height/2;
+      wrap.querySelectorAll('.proj-card').forEach(c=> c.classList.remove('drop-before','drop-after'));
+      card.classList.add(before ? 'drop-before' : 'drop-after');
+    });
+    card.addEventListener('drop', e=>{
+      if(!dragProjectId || card.dataset.project === dragProjectId) return;
+      e.preventDefault();
+      const rect = card.getBoundingClientRect();
+      const before = (e.clientY - rect.top) < rect.height/2;
+      const fromIdx = DATA.projects.findIndex(p=>p.id===dragProjectId);
+      let toIdx = DATA.projects.findIndex(p=>p.id===card.dataset.project);
+      if(fromIdx===-1 || toIdx===-1) return;
+      const [moved] = DATA.projects.splice(fromIdx,1);
+      if(toIdx > fromIdx) toIdx -= 1;
+      const insertAt = before ? toIdx : toIdx+1;
+      DATA.projects.splice(insertAt, 0, moved);
+      scheduleSave();
+      renderProyectos();
+    });
+  });
 }
 
 function statusLabel(s){ return {pendiente:'Pendiente', progreso:'En progreso', completado:'Completado'}[s] || s; }
@@ -987,7 +1082,7 @@ function computeGanttHTML(rows){
     const s = new Date(r.start), e = new Date(r.end);
     const left = Math.max(0,((s-min)/86400000)/span*100);
     const width = Math.max(1.5, ((e-s)/86400000)/span*100);
-    return `<div class="gantt-row">
+    return `<div class="gantt-row${r.key?' gantt-row-clickable':''}" ${r.key?`data-gantt-row="${r.key}"`:''}>
       <div class="gantt-label" title="${escapeHTML(r.label)}">${escapeHTML(r.label)}</div>
       <div class="gantt-track">
         <div class="gantt-bar" style="left:${left}%; width:${width}%; background:${r.barColor};"></div>
