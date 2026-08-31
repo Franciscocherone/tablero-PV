@@ -169,6 +169,8 @@ body{
 .card-date{font-family:var(--font-mono);}
 .card-date.overdue-text{color:var(--rose);}
 .card-importe{font-family:var(--font-mono); font-size:12px; font-weight:600; color:var(--text-dim); margin-bottom:7px;}
+.card-badges{margin-top:6px; display:flex; gap:10px; flex-wrap:wrap;}
+.badge-count{display:inline-flex; align-items:center; gap:3px; font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint);}
 
 .empty-state{
   text-align:center; padding:34px 16px; color:var(--text-faint); font-size:13px;
@@ -261,6 +263,31 @@ body{
 .field-row{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
 .modal-actions{display:flex; justify-content:space-between; align-items:center; margin-top:18px; gap:10px;}
 .modal-actions-right{display:flex; gap:8px;}
+
+/* ---------- COMMENTS ---------- */
+.comment-list{max-height:160px; overflow-y:auto; margin-bottom:10px; display:flex; flex-direction:column; gap:8px;}
+.comment-item{background:var(--panel-2); border:1px solid var(--border-soft); border-radius:var(--radius-sm); padding:8px 10px; font-size:12.5px;}
+.comment-item-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:3px;}
+.comment-date{font-family:var(--font-mono); font-size:10px; color:var(--text-faint);}
+.comment-del{color:var(--text-faint); cursor:pointer; font-size:12px; background:none; border:none; padding:0;}
+.comment-del:hover{color:var(--rose);}
+.comment-empty{font-size:12px; color:var(--text-faint); text-align:center; padding:10px 0;}
+.comment-add-row{display:flex; gap:8px; align-items:flex-end;}
+.comment-add-row textarea{flex:1; resize:none;}
+
+/* ---------- SUBTASKS ---------- */
+.subtask-list{display:flex; flex-direction:column; gap:6px; margin-bottom:10px;}
+.subtask-row{display:flex; align-items:center; gap:8px; background:var(--panel-2); border:1px solid var(--border-soft); border-radius:var(--radius-sm); padding:7px 9px;}
+.subtask-row.done{background:var(--teal-dim); border-color:rgba(46,158,79,.28);}
+.subtask-check{width:16px; height:16px; accent-color:var(--teal); cursor:pointer; flex-shrink:0;}
+.subtask-title{flex:1; font-size:12.5px; color:var(--text);}
+.subtask-row.done .subtask-title{color:#1e6b37; text-decoration:line-through; text-decoration-color:rgba(30,107,55,.4);}
+.subtask-note{width:110px; font-size:11.5px; padding:5px 7px; background:var(--panel); border:1px solid var(--border-soft); border-radius:6px; color:var(--text); font-family:var(--font-mono);}
+.subtask-del{color:var(--text-faint); cursor:pointer; font-size:13px; background:none; border:none; padding:0 2px; flex-shrink:0;}
+.subtask-del:hover{color:var(--rose);}
+.subtask-add-row{display:flex; gap:8px;}
+.subtask-add-row input{flex:1;}
+.template-btn{font-size:11.5px; color:var(--amber); background:none; border:none; cursor:pointer; padding:0; margin-bottom:10px; text-decoration:underline; display:block;}
 
 .toast{
   position:fixed; bottom:22px; left:50%; transform:translateX(-50%);
@@ -634,6 +661,7 @@ function migrateData(){
   DATA.projects.forEach(p=>{
     (p.tasks||[]).forEach(t=>{
       if(!t.updatedAt) t.updatedAt = t.start || todayISO();
+      if(!t.comments) t.comments = [];
     });
   });
   DATA.boutique.forEach(b=>{
@@ -642,6 +670,7 @@ function migrateData(){
     if(b.solped===undefined) b.solped = '';
     if(b.hes===undefined) b.hes = '';
     if(b.importe===undefined) b.importe = '';
+    if(!b.subtasks) b.subtasks = [];
   });
 }
 let saveTimer=null;
@@ -739,6 +768,8 @@ function cardHTML(item){
   const stagnant = isStagnant(item);
   const complete = item.status==='completado';
   const hex = COLOR_HEX[item.color] || COLOR_HEX.amber;
+  const commentBadge = (item.comments && item.comments.length) ? `<span class="badge-count" title="${item.comments.length} comentario(s)">💬 ${item.comments.length}</span>` : '';
+  const subtaskBadge = (item.subtasks && item.subtasks.length) ? `<span class="badge-count" title="Subtareas completadas">☑ ${item.subtasks.filter(s=>s.done).length}/${item.subtasks.length}</span>` : '';
   return `
   <div class="card ${overdue?'overdue':''} ${complete?'is-complete':''}" draggable="true" data-id="${item.id}" data-kind="${item.kind}" data-project="${item.projectId||''}">
     <span class="card-tag" style="background:${hex}22; color:${hex};">${escapeHTML(tagLabel(item))}</span>
@@ -749,6 +780,7 @@ function cardHTML(item){
       <span class="card-resp"><span class="avatar">${initials(item.responsible)}</span>${escapeHTML((item.responsible||'Sin asignar').split(' ')[0])}</span>
       <span class="card-date ${overdue?'overdue-text':''}">${fmtDate(item.end)}</span>
     </div>
+    ${(commentBadge || subtaskBadge) ? `<div class="card-badges">${commentBadge}${subtaskBadge}</div>` : ''}
   </div>`;
 }
 function escapeHTML(s){
@@ -836,7 +868,7 @@ function renderProyectos(){
             ${p.tasks.length ? p.tasks.map(t=>`
               <tr data-task="${t.id}" data-project="${p.id}" class="${t.status==='completado'?'row-complete':''}" draggable="true">
                 <td class="td-handle" title="Arrastrá para reordenar">⠿</td>
-                <td>${escapeHTML(t.title)}</td>
+                <td>${escapeHTML(t.title)}${t.comments && t.comments.length ? ` <span class="badge-count" title="${t.comments.length} comentario(s)">💬 ${t.comments.length}</span>` : ''}</td>
                 <td>${escapeHTML(t.responsible||'—')}</td>
                 <td>${fmtDate(t.start)}</td>
                 <td>${fmtDate(t.end)}</td>
@@ -1068,6 +1100,58 @@ function openQuickAddModal(){
   });
 }
 
+// ---- Task comments ----
+function fmtDateTime(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-AR',{day:'2-digit',month:'short'}).replace('.','') + ' ' + d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+}
+function renderCommentsHTML(comments){
+  if(!comments.length) return `<div class="comment-empty">Sin comentarios todavía</div>`;
+  return comments.slice().reverse().map(c=>`
+    <div class="comment-item" data-comment="${c.id}">
+      <div class="comment-item-head">
+        <span class="comment-date">${fmtDateTime(c.createdAt)}</span>
+        <button class="comment-del" data-delcomment="${c.id}" title="Eliminar comentario">✕</button>
+      </div>
+      <div>${escapeHTML(c.text)}</div>
+    </div>`).join('');
+}
+function addComment(projectId, taskId, text){
+  const p = DATA.projects.find(p=>p.id===projectId);
+  const t = p && p.tasks.find(t=>t.id===taskId);
+  if(!t) return;
+  if(!t.comments) t.comments = [];
+  t.comments.push({id: uid(), text, createdAt: new Date().toISOString()});
+  scheduleSave();
+}
+function deleteComment(projectId, taskId, commentId){
+  const p = DATA.projects.find(p=>p.id===projectId);
+  const t = p && p.tasks.find(t=>t.id===taskId);
+  if(!t) return;
+  t.comments = (t.comments||[]).filter(c=>c.id!==commentId);
+  scheduleSave();
+}
+function refreshTaskComments(projectId, taskId){
+  const p = DATA.projects.find(p=>p.id===projectId);
+  const t = p && p.tasks.find(t=>t.id===taskId);
+  if(!t) return;
+  const box = document.getElementById('tm-comments');
+  if(box) box.innerHTML = renderCommentsHTML(t.comments||[]);
+  const label = document.getElementById('tm-comments-count');
+  if(label) label.textContent = t.comments && t.comments.length ? `(${t.comments.length})` : '';
+  bindCommentDeleteHandlers(projectId, taskId);
+  renderAll();
+}
+function bindCommentDeleteHandlers(projectId, taskId){
+  document.querySelectorAll('#tm-comments [data-delcomment]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      deleteComment(projectId, taskId, btn.dataset.delcomment);
+      refreshTaskComments(projectId, taskId);
+    });
+  });
+}
+
 // ---- Task modal (project task, create/edit) ----
 function openTaskModal(projectId, taskId){
   const p = DATA.projects.find(p=>p.id===projectId);
@@ -1090,6 +1174,15 @@ function openTaskModal(projectId, taskId){
       <div class="field"><label>Inicio</label><input type="date" id="tm-start" value="${t?t.start:todayISO()}"></div>
       <div class="field"><label>Fin</label><input type="date" id="tm-end" value="${t?t.end:todayISO()}"></div>
     </div>
+    ${t ? `
+    <div class="field">
+      <label>Comentarios <span id="tm-comments-count" style="font-weight:400; text-transform:none; letter-spacing:0;">${t.comments && t.comments.length ? `(${t.comments.length})` : ''}</span></label>
+      <div class="comment-list" id="tm-comments">${renderCommentsHTML(t.comments||[])}</div>
+      <div class="comment-add-row">
+        <textarea id="tm-comment-input" rows="2" placeholder="Escribir un comentario…"></textarea>
+        <button class="btn btn-sm" id="tm-comment-add">Agregar</button>
+      </div>
+    </div>` : ''}
     <div class="modal-actions">
       ${t? `<button class="btn btn-danger btn-sm" id="tm-delete">Eliminar</button>` : `<span></span>`}
       <div class="modal-actions-right">
@@ -1103,6 +1196,15 @@ function openTaskModal(projectId, taskId){
     document.getElementById('tm-delete').addEventListener('click', ()=>{
       p.tasks = p.tasks.filter(x=>x.id!==t.id);
       scheduleSave(); closeModal(); renderAll(); showToast('Tarea eliminada');
+    });
+    bindCommentDeleteHandlers(projectId, t.id);
+    document.getElementById('tm-comment-add').addEventListener('click', ()=>{
+      const input = document.getElementById('tm-comment-input');
+      const val = input.value.trim();
+      if(!val) return;
+      addComment(projectId, t.id, val);
+      input.value = '';
+      refreshTaskComments(projectId, t.id);
     });
   }
   document.getElementById('tm-save').addEventListener('click', ()=>{
@@ -1166,6 +1268,91 @@ function openProjectModal(projectId){
   });
 }
 
+// ---- Boutique subtasks ----
+const SUBTASK_TEMPLATE = ['Enviar proforma','Emisión de RDA','Coordinación logística (retiro de mercadería)','HES','Finalizado'];
+function subtaskProgressLabel(subtasks){
+  if(!subtasks.length) return '';
+  return `(${subtasks.filter(s=>s.done).length}/${subtasks.length})`;
+}
+function renderSubtasksHTML(subtasks){
+  if(!subtasks.length) return `<div class="comment-empty">Sin subtareas todavía</div>`;
+  return subtasks.map(s=>`
+    <div class="subtask-row ${s.done?'done':''}" data-subtask="${s.id}">
+      <input type="checkbox" class="subtask-check" data-togglesubtask="${s.id}" ${s.done?'checked':''}>
+      <span class="subtask-title">${escapeHTML(s.title)}</span>
+      <input type="text" class="subtask-note" data-notesubtask="${s.id}" value="${escapeHTML(s.note||'')}" placeholder="N° / detalle">
+      <button class="subtask-del" data-delsubtask="${s.id}" title="Eliminar subtarea">✕</button>
+    </div>`).join('');
+}
+function addSubtask(boutiqueId, title){
+  const b = DATA.boutique.find(x=>x.id===boutiqueId);
+  if(!b) return;
+  if(!b.subtasks) b.subtasks = [];
+  b.subtasks.push({id: uid(), title, done:false, note:''});
+  scheduleSave();
+}
+function toggleSubtask(boutiqueId, subtaskId){
+  const b = DATA.boutique.find(x=>x.id===boutiqueId);
+  const s = b && (b.subtasks||[]).find(s=>s.id===subtaskId);
+  if(!s) return;
+  s.done = !s.done;
+  scheduleSave();
+}
+function updateSubtaskNote(boutiqueId, subtaskId, note){
+  const b = DATA.boutique.find(x=>x.id===boutiqueId);
+  const s = b && (b.subtasks||[]).find(s=>s.id===subtaskId);
+  if(!s) return;
+  s.note = note;
+  scheduleSave();
+}
+function deleteSubtask(boutiqueId, subtaskId){
+  const b = DATA.boutique.find(x=>x.id===boutiqueId);
+  if(!b) return;
+  b.subtasks = (b.subtasks||[]).filter(s=>s.id!==subtaskId);
+  scheduleSave();
+}
+function applySubtaskTemplate(boutiqueId){
+  const b = DATA.boutique.find(x=>x.id===boutiqueId);
+  if(!b) return;
+  if(!b.subtasks) b.subtasks = [];
+  const existingTitles = new Set(b.subtasks.map(s=>s.title));
+  SUBTASK_TEMPLATE.forEach(title=>{
+    if(!existingTitles.has(title)) b.subtasks.push({id: uid(), title, done:false, note:''});
+  });
+  scheduleSave();
+}
+function refreshSubtasks(boutiqueId){
+  const b = DATA.boutique.find(x=>x.id===boutiqueId);
+  if(!b) return;
+  const box = document.getElementById('bm-subtasks');
+  if(box) box.innerHTML = renderSubtasksHTML(b.subtasks||[]);
+  const progress = document.getElementById('bm-subtasks-progress');
+  if(progress) progress.textContent = subtaskProgressLabel(b.subtasks||[]);
+  const templBtn = document.getElementById('bm-subtask-template');
+  if(templBtn) templBtn.style.display = (b.subtasks && b.subtasks.length) ? 'none' : '';
+  bindSubtaskHandlers(boutiqueId);
+  renderAll();
+}
+function bindSubtaskHandlers(boutiqueId){
+  document.querySelectorAll('#bm-subtasks [data-togglesubtask]').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      toggleSubtask(boutiqueId, cb.dataset.togglesubtask);
+      refreshSubtasks(boutiqueId);
+    });
+  });
+  document.querySelectorAll('#bm-subtasks [data-notesubtask]').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      updateSubtaskNote(boutiqueId, inp.dataset.notesubtask, inp.value.trim());
+    });
+  });
+  document.querySelectorAll('#bm-subtasks [data-delsubtask]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      deleteSubtask(boutiqueId, btn.dataset.delsubtask);
+      refreshSubtasks(boutiqueId);
+    });
+  });
+}
+
 // ---- Boutique modal (create/edit) ----
 function openBoutiqueModal(tipo, id){
   const b = id ? DATA.boutique.find(x=>x.id===id) : null;
@@ -1195,6 +1382,16 @@ function openBoutiqueModal(tipo, id){
       </select>
     </div>
     <div class="field"><label>Notas</label><textarea id="bm-notas" rows="2">${b?escapeHTML(b.notas||''):''}</textarea></div>
+    ${b ? `
+    <div class="field">
+      <label>Subtareas <span id="bm-subtasks-progress" style="font-weight:400; text-transform:none; letter-spacing:0;">${subtaskProgressLabel(b.subtasks||[])}</span></label>
+      <div class="subtask-list" id="bm-subtasks">${renderSubtasksHTML(b.subtasks||[])}</div>
+      <button type="button" class="template-btn" id="bm-subtask-template" style="${(b.subtasks&&b.subtasks.length)?'display:none;':''}">+ Usar plantilla estándar (proforma, RDA, logística, HES, finalizado)</button>
+      <div class="subtask-add-row">
+        <input type="text" id="bm-subtask-input" placeholder="Nueva subtarea…">
+        <button class="btn btn-sm" id="bm-subtask-add">+ Agregar</button>
+      </div>
+    </div>` : ''}
     <div class="modal-actions">
       ${b? `<button class="btn btn-danger btn-sm" id="bm-delete">Eliminar</button>` : `<span></span>`}
       <div class="modal-actions-right">
@@ -1209,6 +1406,22 @@ function openBoutiqueModal(tipo, id){
       DATA.boutique = DATA.boutique.filter(x=>x.id!==b.id);
       scheduleSave(); closeModal(); renderAll(); showToast('Eliminado');
     });
+    bindSubtaskHandlers(b.id);
+    document.getElementById('bm-subtask-add').addEventListener('click', ()=>{
+      const input = document.getElementById('bm-subtask-input');
+      const val = input.value.trim();
+      if(!val) return;
+      addSubtask(b.id, val);
+      input.value = '';
+      refreshSubtasks(b.id);
+    });
+    const templBtn = document.getElementById('bm-subtask-template');
+    if(templBtn){
+      templBtn.addEventListener('click', ()=>{
+        applySubtaskTemplate(b.id);
+        refreshSubtasks(b.id);
+      });
+    }
   }
   document.getElementById('bm-save').addEventListener('click', ()=>{
     const title = document.getElementById('bm-title').value.trim();
@@ -1439,20 +1652,23 @@ function buildContextSummary(){
     lines.push(`· ${p.name}`);
     p.tasks.forEach(t=>{
       const overdue = isOverdue(t) ? ' [VENCIDA]' : '';
-      lines.push(`  - ${t.title} | responsable: ${t.responsible||'sin asignar'} | estado: ${statusLabel(t.status)} | inicio: ${t.start} | fin: ${t.end}${overdue}`);
+      const commentsInfo = t.comments && t.comments.length ? ` | comentarios: ${t.comments.map(c=>c.text).join(' / ')}` : '';
+      lines.push(`  - ${t.title} | responsable: ${t.responsible||'sin asignar'} | estado: ${statusLabel(t.status)} | inicio: ${t.start} | fin: ${t.end}${overdue}${commentsInfo}`);
     });
     if(p.tasks.length===0) lines.push('  (sin tareas cargadas)');
   });
   lines.push('\nBOUTIQUE — PEDIDOS INTERNOS:');
   DATA.boutique.filter(b=>b.tipo==='pedido').forEach(b=>{
     const overdue = isOverdue(b) ? ' [VENCIDO]' : '';
-    lines.push(`· ${b.title} | responsable: ${b.responsible||'sin asignar'} | área: ${b.area||'-'} | RDA: ${b.rda||'-'} | SOLPED: ${b.solped||'-'} | HES: ${b.hes||'-'} | importe: ${b.importe||'-'} | estado: ${statusLabel(b.status)} | inicio: ${b.start||'-'} | fin: ${b.end||'-'}${overdue}${b.notas?` | notas: ${b.notas}`:''}`);
+    const subtasksInfo = b.subtasks && b.subtasks.length ? ` | subtareas (${b.subtasks.filter(s=>s.done).length}/${b.subtasks.length}): ${b.subtasks.map(s=>`${s.done?'✓':'☐'} ${s.title}${s.note?` (${s.note})`:''}`).join(', ')}` : '';
+    lines.push(`· ${b.title} | responsable: ${b.responsible||'sin asignar'} | área: ${b.area||'-'} | RDA: ${b.rda||'-'} | SOLPED: ${b.solped||'-'} | HES: ${b.hes||'-'} | importe: ${b.importe||'-'} | estado: ${statusLabel(b.status)} | inicio: ${b.start||'-'} | fin: ${b.end||'-'}${overdue}${b.notas?` | notas: ${b.notas}`:''}${subtasksInfo}`);
   });
   lines.push('\nBOUTIQUE — RECLAMOS:');
   DATA.boutique.filter(b=>b.tipo==='reclamo').forEach(b=>{
     const overdue = isOverdue(b) ? ' [VENCIDO]' : '';
     const stagnant = isStagnant(b) ? ` [SIN MOVIMIENTO HACE ${daysSince(b.updatedAt)} DÍAS]` : '';
-    lines.push(`· ${b.title} | responsable: ${b.responsible||'sin asignar'} | área: ${b.area||'-'} | RDA: ${b.rda||'-'} | SOLPED: ${b.solped||'-'} | HES: ${b.hes||'-'} | importe: ${b.importe||'-'} | estado: ${statusLabel(b.status)} | inicio: ${b.start||'-'} | fin: ${b.end||'-'}${overdue}${stagnant}${b.notas?` | notas: ${b.notas}`:''}`);
+    const subtasksInfo = b.subtasks && b.subtasks.length ? ` | subtareas (${b.subtasks.filter(s=>s.done).length}/${b.subtasks.length}): ${b.subtasks.map(s=>`${s.done?'✓':'☐'} ${s.title}${s.note?` (${s.note})`:''}`).join(', ')}` : '';
+    lines.push(`· ${b.title} | responsable: ${b.responsible||'sin asignar'} | área: ${b.area||'-'} | RDA: ${b.rda||'-'} | SOLPED: ${b.solped||'-'} | HES: ${b.hes||'-'} | importe: ${b.importe||'-'} | estado: ${statusLabel(b.status)} | inicio: ${b.start||'-'} | fin: ${b.end||'-'}${overdue}${stagnant}${b.notas?` | notas: ${b.notas}`:''}${subtasksInfo}`);
   });
   return lines.join('\n');
 }
