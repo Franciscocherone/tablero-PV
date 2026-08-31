@@ -1,0 +1,9 @@
+{
+  "name": "tablero-pv",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tablero de seguimiento de proyectos y boutique - Marketing Posventa",
+  "dependencies": {
+    "@upstash/redis": "^1.34.0"
+  }
+}

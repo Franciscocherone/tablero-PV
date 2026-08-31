@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tablero PV — Marketing Posventa</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+:root{
+  --bg:#F7F4EC;
+  --panel:#FFFFFF;
+  --panel-2:#F3EFE4;
+  --panel-3:#EAE4D4;
+  --border:#E2DBC8;
+  --border-soft:#EBE5D6;
+  --text:#2B261E;
+  --text-dim:#79705D;
+  --text-faint:#A79C83;
+  --amber:#C9683F;
+  --amber-dim:#F3E3D6;
+  --amber-glow:rgba(201,104,63,.25);
+  --teal:#2E9E4F;
+  --teal-dim:#DEF3E2;
+  --blue:#4A6FD4;
+  --blue-dim:#E4E9F9;
+  --violet:#8272C4;
+  --violet-dim:#EBE6F6;
+  --rose:#C85A50;
+  --rose-dim:#F6E1DE;
+  --radius:12px;
+  --radius-sm:8px;
+  --font-display:'Fraunces','Iowan Old Style',serif;
+  --font-body:'Inter',ui-sans-serif,system-ui,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,'SF Mono',monospace;
+  --shadow-card:0 1px 2px rgba(43,38,30,.05), 0 2px 10px rgba(43,38,30,.04);
+  --shadow-pop:0 20px 50px -12px rgba(43,38,30,.22);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(1100px 560px at 12% -10%, rgba(201,104,63,.08), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(74,111,212,.05), transparent 55%),
+    var(--bg);
+  color:var(--text);
+  font-family:var(--font-body);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+#app{max-width:1180px;margin:0 auto;padding:0 20px 60px;}
+
+/* ---------- TOPBAR ---------- */
+.topbar{
+  position:sticky; top:0; z-index:20;
+  background:linear-gradient(180deg, rgba(247,244,236,.97), rgba(247,244,236,.88));
+  backdrop-filter:blur(8px);
+  padding:20px 0 0;
+  border-bottom:1px solid var(--border-soft);
+}
+.topbar-head{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+.brand{display:flex; align-items:center; gap:12px;}
+.brand-mark{
+  width:38px;height:38px;border-radius:10px;
+  background:linear-gradient(145deg, var(--amber), #a4502f);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-display); font-weight:700; font-size:15px; color:#fff;
+  box-shadow:0 0 0 1px rgba(201,104,63,.18), 0 6px 18px -6px var(--amber-glow);
+  flex-shrink:0;
+}
+.brand h1{font-family:var(--font-display); font-size:20px; font-weight:600; margin:0; letter-spacing:.1px;}
+.brand p{margin:2px 0 0; font-size:12.5px; color:var(--text-dim);}
+.shift-strip{
+  display:flex; gap:18px; align-items:center;
+  font-family:var(--font-mono); font-size:12px; color:var(--text-dim);
+  padding:8px 14px; background:var(--panel); border:1px solid var(--border-soft); border-radius:999px;
+}
+.shift-strip b{color:var(--amber); font-weight:600;}
+.shift-dot{width:6px;height:6px;border-radius:50%;background:var(--teal); box-shadow:0 0 8px var(--teal); display:inline-block; margin-right:6px;}
+
+.tabs{display:flex; gap:4px; margin-top:18px;}
+.tab-btn{
+  appearance:none; border:none; background:transparent; color:var(--text-dim);
+  font-family:var(--font-display); font-size:14px; font-weight:600;
+  padding:11px 16px; cursor:pointer; border-bottom:2px solid transparent;
+  transition:color .15s ease, border-color .15s ease;
+}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--amber); border-bottom-color:var(--amber);}
+.tab-count{
+  font-family:var(--font-mono); font-size:10.5px; margin-left:6px; color:var(--text-faint);
+  background:var(--panel-2); padding:1px 6px; border-radius:20px; border:1px solid var(--border-soft);
+}
+.tab-btn.active .tab-count{color:var(--amber); border-color:rgba(255,176,32,.3);}
+
+/* ---------- VIEWS ---------- */
+.view{display:none; padding-top:22px;}
+.view.active{display:block; animation:fadein .25s ease;}
+@keyframes fadein{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
+
+.toolbar{display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px;}
+.chips{display:flex; gap:8px; flex-wrap:wrap;}
+.chip{
+  font-size:12.5px; font-family:var(--font-body); font-weight:500; color:var(--text-dim);
+  background:var(--panel-2); border:1px solid var(--border-soft); padding:6px 12px; border-radius:999px; cursor:pointer;
+  transition:all .15s ease;
+}
+.chip:hover{color:var(--text); border-color:var(--border);}
+.chip.active{background:var(--amber-dim); color:var(--amber); border-color:rgba(255,176,32,.4);}
+.search-box{
+  background:var(--panel-2); border:1px solid var(--border-soft); border-radius:var(--radius-sm);
+  padding:8px 12px; font-size:13px; color:var(--text); font-family:var(--font-body); width:210px;
+}
+.search-box:focus{outline:none; border-color:var(--amber);}
+.search-box::placeholder{color:var(--text-faint);}
+
+.btn{
+  font-family:var(--font-body); font-weight:600; font-size:13px; cursor:pointer;
+  border-radius:var(--radius-sm); padding:9px 14px; border:1px solid var(--border);
+  background:var(--panel-2); color:var(--text); transition:all .15s ease; display:inline-flex; align-items:center; gap:6px;
+}
+.btn:hover{border-color:var(--text-faint); transform:translateY(-1px);}
+.btn-primary{background:var(--amber); color:#fff; border-color:var(--amber);}
+.btn-primary:hover{background:#b95a33; box-shadow:0 4px 16px -4px var(--amber-glow);}
+.btn-ghost{background:transparent; border-color:transparent; color:var(--text-dim); padding:8px 10px;}
+.btn-ghost:hover{color:var(--text); background:var(--panel-2);}
+.btn-danger{color:var(--rose); border-color:transparent; background:transparent;}
+.btn-danger:hover{background:var(--rose-dim);}
+.btn-sm{padding:6px 10px; font-size:12px;}
+
+/* ---------- KANBAN ---------- */
+.kanban{display:grid; grid-template-columns:repeat(3,1fr); gap:16px;}
+@media(max-width:820px){.kanban{grid-template-columns:1fr;}}
+.kcol{background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius); padding:12px; min-height:120px; box-shadow:var(--shadow-card);}
+.kcol.dragover{border-color:var(--amber); box-shadow:inset 0 0 0 1px var(--amber);}
+.kcol-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; padding:0 2px;}
+.kcol-title{font-family:var(--font-display); font-size:13px; font-weight:700; letter-spacing:.3px; text-transform:uppercase;}
+.kcol-title.pendiente{color:var(--text-dim);}
+.kcol-title.progreso{color:var(--amber);}
+.kcol-title.completado{color:var(--teal);}
+.kcol-badge{font-family:var(--font-mono); font-size:11px; color:var(--text-faint); background:var(--panel-2); padding:1px 7px; border-radius:20px;}
+
+.card{
+  background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius-sm);
+  padding:11px 12px; margin-bottom:9px; cursor:grab; transition:border-color .15s ease, transform .1s ease, box-shadow .15s ease;
+  box-shadow:0 1px 2px rgba(43,38,30,.04);
+}
+.card:hover{border-color:var(--border); transform:translateY(-1px); box-shadow:var(--shadow-card);}
+.card:active{cursor:grabbing;}
+.card.overdue{border-left:3px solid var(--rose);}
+.card.is-complete{background:var(--teal-dim); border-color:rgba(46,158,79,.28);}
+.card.is-complete .card-title{color:#1e6b37;}
+.card-tag{
+  display:inline-flex; align-items:center; gap:5px; font-family:var(--font-mono); font-size:10.5px;
+  font-weight:600; padding:2px 8px; border-radius:20px; margin-bottom:7px;
+}
+.card-title{font-size:13.5px; font-weight:600; line-height:1.35; margin-bottom:6px;}
+.stagnant-badge{
+  display:inline-block; font-family:var(--font-mono); font-size:10px; font-weight:600;
+  background:var(--rose-dim); color:var(--rose); padding:2px 8px; border-radius:20px; margin:0 0 7px 6px;
+}
+.card-meta{display:flex; align-items:center; justify-content:space-between; font-size:11.5px; color:var(--text-faint);}
+.card-resp{display:flex; align-items:center; gap:5px;}
+.avatar{
+  width:17px;height:17px;border-radius:50%; background:var(--panel-3); color:var(--text-dim);
+  display:flex;align-items:center;justify-content:center; font-size:9px; font-weight:700; font-family:var(--font-mono); flex-shrink:0;
+}
+.card-date{font-family:var(--font-mono);}
+.card-date.overdue-text{color:var(--rose);}
+.card-importe{font-family:var(--font-mono); font-size:12px; font-weight:600; color:var(--text-dim); margin-bottom:7px;}
+
+.empty-state{
+  text-align:center; padding:34px 16px; color:var(--text-faint); font-size:13px;
+}
+
+/* ---------- PROYECTOS ---------- */
+.proj-card{
+  background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius);
+  margin-bottom:14px; overflow:hidden; box-shadow:var(--shadow-card);
+}
+.proj-head{
+  display:flex; align-items:center; justify-content:space-between; padding:15px 16px; cursor:pointer; gap:12px; flex-wrap:wrap;
+}
+.proj-head:hover{background:rgba(255,255,255,.015);}
+.proj-title-wrap{display:flex; align-items:center; gap:10px; min-width:0;}
+.proj-dot{width:9px;height:9px;border-radius:3px; flex-shrink:0;}
+.proj-name{font-family:var(--font-display); font-weight:700; font-size:15px;}
+.proj-stats{display:flex; align-items:center; gap:14px; font-family:var(--font-mono); font-size:11.5px; color:var(--text-dim);}
+.proj-progress-track{width:90px; height:5px; background:var(--panel-3); border-radius:20px; overflow:hidden;}
+.proj-progress-fill{height:100%; border-radius:20px;}
+.proj-chevron{transition:transform .2s ease; color:var(--text-faint);}
+.proj-card.open .proj-chevron{transform:rotate(180deg);}
+.proj-body{display:none; padding:0 16px 18px; border-top:1px solid var(--border-soft);}
+.proj-card.open .proj-body{display:block;}
+
+.gantt-wrap{margin:16px 0 18px; overflow-x:auto;}
+.gantt{min-width:560px;}
+.gantt-months{display:flex; font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); border-bottom:1px solid var(--border-soft); padding-bottom:6px; margin-bottom:8px;}
+.gantt-row{display:flex; align-items:center; height:30px; position:relative;}
+.gantt-label{width:150px; flex-shrink:0; font-size:12px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:10px;}
+.gantt-track{flex:1; position:relative; height:16px; background:var(--panel-2); border-radius:5px;}
+.gantt-bar{position:absolute; top:0; height:100%; border-radius:5px; min-width:5px;}
+.gantt-today{position:absolute; top:-6px; bottom:-6px; width:2px; background:var(--amber); box-shadow:0 0 6px var(--amber-glow); z-index:5;}
+
+.task-table{width:100%; border-collapse:collapse; margin-top:6px;}
+.task-table th{
+  text-align:left; font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.4px;
+  color:var(--text-faint); padding:6px 8px; border-bottom:1px solid var(--border-soft); font-weight:600;
+}
+.task-table td{padding:9px 8px; font-size:13px; border-bottom:1px solid var(--border-soft); vertical-align:middle;}
+.task-table tr:last-child td{border-bottom:none;}
+.task-table tr{cursor:pointer;}
+.task-table tr:hover td{background:rgba(43,38,30,.025);}
+.task-table tr.row-complete td{background:var(--teal-dim);}
+.task-table tr.row-complete:hover td{background:#d3ecd8;}
+.th-handle{width:22px;}
+.td-handle{
+  width:22px; text-align:center; color:var(--text-faint); cursor:grab; font-size:13px;
+  letter-spacing:-1px; user-select:none;
+}
+.td-handle:active{cursor:grabbing;}
+.task-table tr.row-dragging{opacity:.4;}
+.task-table tr.drop-before{box-shadow:inset 0 2px 0 0 var(--amber);}
+.task-table tr.drop-after{box-shadow:inset 0 -2px 0 0 var(--amber);}
+.status-pill{
+  font-family:var(--font-mono); font-size:10.5px; font-weight:600; padding:3px 9px; border-radius:20px; display:inline-block;
+}
+.status-pill.pendiente{background:var(--panel-3); color:var(--text-dim);}
+.status-pill.progreso{background:var(--amber-dim); color:var(--amber);}
+.status-pill.completado{background:var(--teal-dim); color:var(--teal);}
+
+.add-project-row{display:flex; justify-content:center; margin-top:6px;}
+
+/* ---------- BOUTIQUE ---------- */
+.boutique-grid{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
+@media(max-width:820px){.boutique-grid{grid-template-columns:1fr;}}
+.bt-col-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
+.bt-title{font-family:var(--font-display); font-weight:700; font-size:15px; display:flex; align-items:center; gap:8px;}
+.bt-title-dot{width:9px;height:9px;border-radius:3px;}
+
+/* ---------- MODAL ---------- */
+.modal-overlay{
+  position:fixed; inset:0; background:rgba(8,10,14,.72); backdrop-filter:blur(3px);
+  display:flex; align-items:center; justify-content:center; z-index:100; padding:20px;
+}
+.modal-overlay.hidden{display:none;}
+.modal{
+  background:var(--panel); border:1px solid var(--border); border-radius:16px;
+  width:100%; max-width:440px; max-height:88vh; overflow-y:auto;
+  padding:22px; box-shadow:var(--shadow-pop);
+}
+.modal h2{font-family:var(--font-display); font-size:17px; margin:0 0 16px;}
+.field{margin-bottom:13px;}
+.field label{display:block; font-size:11.5px; font-weight:600; color:var(--text-dim); margin-bottom:5px; text-transform:uppercase; letter-spacing:.3px; font-family:var(--font-mono);}
+.field input, .field select, .field textarea{
+  width:100%; background:var(--panel-2); border:1px solid var(--border-soft); border-radius:var(--radius-sm);
+  padding:9px 11px; color:var(--text); font-family:var(--font-body); font-size:13.5px;
+}
+.field input:focus, .field select:focus, .field textarea:focus{outline:none; border-color:var(--amber);}
+.field-row{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+.modal-actions{display:flex; justify-content:space-between; align-items:center; margin-top:18px; gap:10px;}
+.modal-actions-right{display:flex; gap:8px;}
+
+.toast{
+  position:fixed; bottom:22px; left:50%; transform:translateX(-50%);
+  background:var(--panel-3); border:1px solid var(--border); color:var(--text);
+  padding:10px 18px; border-radius:999px; font-size:13px; z-index:200; font-family:var(--font-body);
+  box-shadow:0 10px 30px -8px rgba(0,0,0,.5);
+}
+.toast.hidden{display:none;}
+
+/* ---------- ASISTENTE IA ---------- */
+.ai-layout{display:flex; justify-content:center;}
+.ai-chat-panel{
+  width:100%; max-width:680px; background:var(--panel); border:1px solid var(--border-soft);
+  border-radius:16px; box-shadow:var(--shadow-card); display:flex; flex-direction:column;
+  overflow:hidden;
+}
+.chat-messages{padding:22px 20px 8px; min-height:280px; max-height:52vh; overflow-y:auto; display:flex; flex-direction:column; gap:14px;}
+.chat-empty{text-align:center; padding:30px 20px; color:var(--text-dim);}
+.chat-empty-mark{
+  width:42px;height:42px;border-radius:50%; background:var(--amber-dim); color:var(--amber);
+  display:flex; align-items:center; justify-content:center; font-size:18px; margin:0 auto 14px;
+}
+.chat-empty p{font-size:13.5px; line-height:1.5; margin:0 auto 6px; max-width:420px;}
+.chat-empty-note{font-size:12px; color:var(--text-faint);}
+.chat-bubble{max-width:82%; padding:11px 14px; border-radius:14px; font-size:13.5px; line-height:1.55; white-space:pre-wrap;}
+.chat-bubble.user{align-self:flex-end; background:var(--amber); color:#fff; border-bottom-right-radius:4px;}
+.chat-bubble.assistant{align-self:flex-start; background:var(--panel-2); color:var(--text); border-bottom-left-radius:4px;}
+.chat-bubble.loading{color:var(--text-faint); font-style:italic;}
+.ai-suggestions{display:flex; gap:8px; flex-wrap:wrap; padding:4px 20px 14px; border-top:1px solid var(--border-soft); margin-top:6px; padding-top:14px;}
+.suggestion-chip{
+  font-size:12px; font-family:var(--font-body); font-weight:500; color:var(--amber);
+  background:var(--amber-dim); border:1px solid transparent; padding:6px 12px; border-radius:999px; cursor:pointer;
+}
+.suggestion-chip:hover{border-color:var(--amber);}
+.chat-input-row{display:flex; gap:10px; padding:0 20px 18px; align-items:flex-end;}
+.chat-input-row textarea{
+  flex:1; resize:none; background:var(--panel-2); border:1px solid var(--border-soft); border-radius:var(--radius-sm);
+  padding:10px 12px; font-family:var(--font-body); font-size:13.5px; color:var(--text); max-height:120px;
+}
+.chat-input-row textarea:focus{outline:none; border-color:var(--amber);}
+.ai-disclaimer{font-size:11px; color:var(--text-faint); text-align:center; padding:0 20px 16px;}
+
+::-webkit-scrollbar{height:8px; width:8px;}
+::-webkit-scrollbar-thumb{background:var(--border); border-radius:8px;}
+::-webkit-scrollbar-track{background:transparent;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="topbar">
+    <div class="topbar-head">
+      <div class="brand">
+        <div class="brand-mark">PV</div>
+        <div>
+          <h1>Tablero PV</h1>
+          <p>Marketing Posventa — Negocios Alternativos &amp; Boutique</p>
+        </div>
+      </div>
+      <div class="shift-strip">
+        <span><span class="shift-dot"></span><span id="todayLabel">—</span></span>
+        <span>Pendientes <b id="statPend">0</b></span>
+        <span>En curso <b id="statProg">0</b></span>
+        <span>Vencidas <b id="statOver">0</b></span>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="hoy">Hoy <span class="tab-count" id="cntHoy">0</span></button>
+      <button class="tab-btn" data-tab="proyectos">Proyectos <span class="tab-count" id="cntProy">0</span></button>
+      <button class="tab-btn" data-tab="boutique">Boutique <span class="tab-count" id="cntBou">0</span></button>
+      <button class="tab-btn" data-tab="asistente">✦ Asistente IA</button>
+    </div>
+  </div>
+
+  <!-- ================= HOY ================= -->
+  <section class="view active" id="view-hoy">
+    <div class="toolbar">
+      <div class="chips" id="hoyFilters">
+        <div class="chip active" data-filter="todos">Todo</div>
+        <div class="chip" data-filter="proyecto">Proyectos</div>
+        <div class="chip" data-filter="pedido">Pedidos internos</div>
+        <div class="chip" data-filter="reclamo">Reclamos</div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <input class="search-box" id="hoySearch" placeholder="Buscar tarea…">
+        <button class="btn btn-primary" id="btnQuickAdd">+ Nueva tarea</button>
+      </div>
+    </div>
+    <div class="kanban">
+      <div class="kcol" data-status="pendiente">
+        <div class="kcol-head"><span class="kcol-title pendiente">Pendiente</span><span class="kcol-badge" id="cPendiente">0</span></div>
+        <div class="kcol-body" id="col-pendiente"></div>
+      </div>
+      <div class="kcol" data-status="progreso">
+        <div class="kcol-head"><span class="kcol-title progreso">En progreso</span><span class="kcol-badge" id="cProgreso">0</span></div>
+        <div class="kcol-body" id="col-progreso"></div>
+      </div>
+      <div class="kcol" data-status="completado">
+        <div class="kcol-head"><span class="kcol-title completado">Completado</span><span class="kcol-badge" id="cCompletado">0</span></div>
+        <div class="kcol-body" id="col-completado"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PROYECTOS ================= -->
+  <section class="view" id="view-proyectos">
+    <div class="toolbar">
+      <div style="font-size:13px; color:var(--text-dim);">Vista Gantt por proyecto — tocá una tarjeta para expandirla</div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn" id="btnExport">⬇ Exportar a Excel</button>
+        <button class="btn btn-primary" id="btnNewProject">+ Nuevo proyecto</button>
+      </div>
+    </div>
+    <div id="projectsList"></div>
+  </section>
+
+  <!-- ================= BOUTIQUE ================= -->
+  <section class="view" id="view-boutique">
+    <div class="toolbar">
+      <div style="font-size:13px; color:var(--text-dim);">Pedidos internos de boutique y reclamos, por separado</div>
+    </div>
+    <div class="boutique-grid">
+      <div>
+        <div class="bt-col-head">
+          <div class="bt-title"><span class="bt-title-dot" style="background:var(--blue);"></span>Pedidos internos</div>
+          <button class="btn btn-sm" data-newbt="pedido">+ Agregar</button>
+        </div>
+        <div id="bt-pedido"></div>
+      </div>
+      <div>
+        <div class="bt-col-head">
+          <div class="bt-title"><span class="bt-title-dot" style="background:var(--rose);"></span>Reclamos</div>
+          <button class="btn btn-sm" data-newbt="reclamo">+ Agregar</button>
+        </div>
+        <div id="bt-reclamo"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= ASISTENTE IA ================= -->
+  <section class="view" id="view-asistente">
+    <div class="ai-layout">
+      <div class="ai-chat-panel">
+        <div class="chat-messages" id="chatMessages">
+          <div class="chat-empty">
+            <div class="chat-empty-mark">✦</div>
+            <p>Escribí tu consulta — copio el estado actual de tu tablero junto con tu pregunta al portapapeles y te abro una pestaña de Claude para que la pegues.</p>
+            <p class="chat-empty-note">Usa tu Claude Pro, sin costo extra. Solo pegá (Ctrl/Cmd+V) y enviá en la pestaña que se abre.</p>
+          </div>
+        </div>
+        <div class="ai-suggestions" id="aiSuggestions">
+          <button class="suggestion-chip" data-prompt="Dame un resumen de mi día: qué está vencido, qué vence hoy y qué debería priorizar.">Resumen del día</button>
+          <button class="suggestion-chip" data-prompt="¿Qué debería priorizar esta semana teniendo en cuenta las fechas de fin?">Prioridades de la semana</button>
+          <button class="suggestion-chip" data-prompt="Redactame un mensaje corto de seguimiento para el reclamo o pedido más urgente que tengo pendiente.">Redactar mensaje</button>
+        </div>
+        <div class="chat-input-row">
+          <textarea id="chatInput" placeholder="Escribí tu consulta…" rows="1"></textarea>
+          <button class="btn btn-primary" id="chatSend">Copiar y abrir Claude</button>
+        </div>
+        <div class="ai-disclaimer">Puente manual con tu Claude Pro — no hay API paga conectada. Cada clic copia tu pregunta + el estado del tablero al portapapeles.</div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<div class="modal-overlay hidden" id="modalOverlay">
+  <div class="modal" id="modal"></div>
+</div>
+<div class="toast hidden" id="toast"></div>
+
+<script>
+/* ============================================================
+   DATA LAYER
+============================================================ */
+const STORAGE_KEY = 'pv-tracker-data-v3';
+const PROJECT_COLORS = ['amber','teal','blue','violet','gold'];
+const COLOR_HEX = { amber:'#C9683F', teal:'#1F8B7A', blue:'#4A6FD4', violet:'#8272C4', rose:'#C85A50', gold:'#B98B2E' };
+
+let DATA = null;
+let editingId = null; // {kind:'task'|'project'|'boutique', id, projectId}
+
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(iso){
+  if(!iso) return '—';
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('es-AR',{day:'2-digit',month:'short'}).replace('.','');
+}
+function initials(name){
+  if(!name) return '—';
+  return name.trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
+}
+
+function seedData(){
+  const s = (est)=> est==='Completado' ? 'completado' : (est==='En Progreso' ? 'progreso' : 'pendiente');
+  return {
+    projects: [
+      { id: uid(), name:'Indumentaria Comercial LPM', color:'amber', tasks:[
+        { id: uid(), title:'Cerrar web de toma de pedidos (1ª tanda — 7 CEs)', responsible:'Francisco', start:'2026-05-12', end:'2026-06-05', status:s('Completado') },
+        { id: uid(), title:'Pasarle pedidos a Norauto (1ª tanda — 7 CEs)', responsible:'Francisco', start:'2026-06-08', end:'2026-06-12', status:s('Completado') },
+        { id: uid(), title:'Entrega a los concesionarios (1ª tanda — 7 CEs)', responsible:'Francisco', start:'2026-06-05', end:'2026-07-13', status:s('Completado') },
+        { id: uid(), title:'Tomar pedidos (2ª tanda — 3 CEs)', responsible:'Francisco', start:'2026-07-13', end:'2026-07-22', status:s('Completado') },
+        { id: uid(), title:'OC Norauto a Proveedor (2ª tanda — 3 CEs)', responsible:'Emiliano', start:'2026-07-22', end:'2026-07-28', status:s('Completado') },
+        { id: uid(), title:'Producción y confección (2ª tanda — 3 CEs)', responsible:'NTDS', start:'2026-07-22', end:'2026-09-01', status:s('En Progreso') },
+        { id: uid(), title:'Entrega a Norauto (2ª tanda — 3 CEs)', responsible:'NTDS', start:'2026-09-01', end:'2026-09-08', status:s('Pendiente') },
+        { id: uid(), title:'Distribución RED (2ª tanda — 3 CEs)', responsible:'Norauto', start:'2026-09-01', end:'2026-09-10', status:s('Pendiente') },
+      ]},
+      { id: uid(), name:'WELCOME KIT', color:'teal', tasks:[
+        { id: uid(), title:'Actualizar MP 06 - Proyección', responsible:'Francisco', start:'2026-06-08', end:'2026-06-08', status:s('Completado') },
+        { id: uid(), title:'Crear PN necesarios por pieza para todas las marcas (STOCK)', responsible:'Francisco', start:'2026-06-08', end:'2026-06-12', status:s('Completado') },
+        { id: uid(), title:'Crear SOLPED y DA', responsible:'Francisco', start:'2026-06-12', end:'2026-06-17', status:s('Completado') },
+        { id: uid(), title:'Definir FIAT con Ezequiel', responsible:'Diego / Fran', start:'2026-06-16', end:'2026-06-19', status:s('Completado') },
+        { id: uid(), title:'Enviar a Tomás la estimación de cantidades por costos', responsible:'Diego / Fran', start:'2026-06-16', end:'2026-06-19', status:s('Completado') },
+        { id: uid(), title:'Costos definitivos de los productos / precios de transferencia', responsible:'Emiliano Tedesco', start:'2026-06-10', end:'2026-07-03', status:s('Completado') },
+        { id: uid(), title:'Orden de compra Norauto a TROWN por costos', responsible:'Emiliano Tedesco', start:'2026-06-10', end:'2026-08-15', status:s('Pendiente') },
+        { id: uid(), title:'Creación de contratos INTERCOMPANY', responsible:'Francisco / Diego', start:'2026-06-22', end:'2026-08-20', status:s('Pendiente') },
+      ]},
+      { id: uid(), name:'RDT PV', color:'blue', tasks:[
+        { id: uid(), title:'Armar circular comercial + catálogos', responsible:'Francisco', start:'2026-07-02', end:'2026-07-15', status:s('Completado') },
+        { id: uid(), title:'Actualizar WEB toma de pedidos', responsible:'Francisco', start:'2026-07-01', end:'2026-07-10', status:s('Completado') },
+        { id: uid(), title:'Toma de pedidos', responsible:'Francisco', start:'2026-07-10', end:'2026-07-22', status:s('Completado') },
+        { id: uid(), title:'Actualización de costos / EERR', responsible:'Francisco', start:'2026-05-15', end:'2026-07-03', status:s('Completado') },
+        { id: uid(), title:'Transfer price', responsible:'Norauto', start:'2026-07-10', end:'2026-07-17', status:s('Completado') },
+        { id: uid(), title:'1º OC - Norauto > NTDS', responsible:'Emiliano', start:'2026-07-22', end:'2026-07-26', status:s('Completado') },
+        { id: uid(), title:'Anticipo Stellantis > Norauto', responsible:'Francisco / Diego', start:'2026-07-27', end:'2026-08-03', status:s('Completado') },
+        { id: uid(), title:'Producción y confección', responsible:'NTDS', start:'2026-07-22', end:'2026-09-13', status:s('En Progreso') },
+      ]},
+      { id: uid(), name:'BOUTIQUE FCA', color:'violet', tasks:[
+        { id: uid(), title:'Contestar mail por cajas pendientes — consultar ingreso de JEEP y RAM al stock', responsible:'Francisco', start:'2026-06-08', end:'2026-06-19', status:s('Pendiente') },
+        { id: uid(), title:'Hacer el mail para destrabar reabastecimiento de piezas', responsible:'Francisco', start:'2026-06-08', end:'2026-06-12', status:s('Completado') },
+        { id: uid(), title:'Armar listado de catalogación + stock a almacenar', responsible:'', start:todayISO(), end:todayISO(), status:s('Pendiente') },
+      ]},
+      { id: uid(), name:'BOUTIQUE PSA', color:'gold', tasks:[
+        { id: uid(), title:'Armar reunión reabastecimiento de piezas', responsible:'Francisco', start:'2026-06-08', end:'2026-06-16', status:s('Completado') },
+        { id: uid(), title:'Parametrizar piezas como STOCK (las piezas pasan a stockearse; quedan los pedidos hasta liberar el techo)', responsible:'Francisco', start:'2026-05-20', end:'2026-06-15', status:s('Completado') },
+      ]},
+    ],
+    boutique: [
+      { id: uid(), tipo:'pedido', title:'Enviar precios a CXC de RDT', responsible:'Francisco', area:'CXC', rda:'-', solped:'-', hes:'-', importe:'$ 2.983.635', start:'2026-05-27', end:'2026-06-08', status:'completado', notas:'' },
+      { id: uid(), tipo:'pedido', title:'Pedido exhibición PRESS DAY', responsible:'Francisco', area:'Marketing Posventa', rda:'101593937', solped:'-', hes:'5135011', importe:'$ 5.025.024', start:'2026-05-28', end:'2026-06-05', status:'completado', notas:'' },
+      { id: uid(), tipo:'pedido', title:'Obsequios Press Day', responsible:'Francisco', area:'Marketing Posventa', rda:'101593925', solped:'-', hes:'5131684', importe:'$ 2.561.420', start:'2026-05-28', end:'2026-06-05', status:'completado', notas:'' },
+      { id: uid(), tipo:'pedido', title:'Pedido Boutique BRAND RAM', responsible:'Alan Petersen', area:'Brand RAM', rda:'42132483', solped:'-', hes:'5125591', importe:'$ 2.129.240,52', start:'2026-05-28', end:'2026-06-09', status:'completado', notas:'' },
+      { id: uid(), tipo:'pedido', title:'Plan de ahorro - Challenge', responsible:'Ximena Sayas', area:'Plan de Ahorro', rda:'101592281', solped:'112819', hes:'5148079', importe:'$ 41.095.738', start:'2026-04-10', end:'2026-06-19', status:'progreso', notas:'' },
+      { id: uid(), tipo:'pedido', title:'2da factura + Conservadora y cuchillos', responsible:'Ximena Sayas', area:'Plan de Ahorro', rda:'42133601', solped:'-', hes:'5149830', importe:'$ 396.030,48', start:'2026-08-01', end:'2026-08-05', status:'completado', notas:'' },
+      { id: uid(), tipo:'pedido', title:'Activación PRODE - RRHH', responsible:'Justina Bentivenga', area:'RRHH', rda:'-', solped:'10042227', hes:'5004508669', importe:'$ 11.746.285,20', start:'2026-05-04', end:'2026-06-10', status:'completado', notas:'' },
+      { id: uid(), tipo:'pedido', title:'Academys Córdoba', responsible:'Matías Cornejo', area:'BMC', rda:'31945132', solped:'-', hes:'5125529', importe:'$ 17.794.124', start:'2026-04-14', end:'2026-06-08', status:'completado', notas:'' },
+      { id: uid(), tipo:'pedido', title:'Academys Córdoba (2ª factura)', responsible:'Matías Cornejo', area:'BMC', rda:'-', solped:'PENDIENTE', hes:'-', importe:'$ 3.925.404', start:'2026-04-14', end:'2026-06-08', status:'progreso', notas:'' },
+      { id: uid(), tipo:'pedido', title:'Pedido Suarez Salvia', responsible:'Francisco', area:'Marketing Posventa', rda:'31945521', solped:'-', hes:'5135016', importe:'$ 5.317.363,71', start:'2026-05-22', end:'2026-05-26', status:'completado', notas:'' },
+      { id: uid(), tipo:'pedido', title:'Facturas SCS - BMC', responsible:'Matías Cornejo', area:'BMC', rda:'31945629', solped:'-', hes:'5136518', importe:'$ 8.211.227', start:'2026-02-15', end:'2026-06-12', status:'completado', notas:'' },
+      { id: uid(), tipo:'reclamo', title:'TOULON — 14 zapatos pendientes', responsible:'', area:'ROPA DE TRABAJO', rda:'', solped:'', hes:'', start:'', end:'', status:'pendiente', notas:'CE 3882 — Pedido 7061104. 14 ZAPATOS pendientes.' },
+      { id: uid(), tipo:'reclamo', title:'Granville', responsible:'', area:'BOUTIQUE PSA', rda:'', solped:'', hes:'', start:'', end:'', status:'pendiente', notas:'' },
+      { id: uid(), tipo:'reclamo', title:'Centenario — cruce de cajas', responsible:'', area:'ROPA DE TRABAJO', rda:'', solped:'', hes:'', start:'', end:'', status:'pendiente', notas:'Cruce de cajas. A la espera de que retiren por sucursales.' },
+      { id: uid(), tipo:'reclamo', title:'Nave Motors — pedido mal cargado', responsible:'', area:'BOUTIQUE PSA', rda:'', solped:'', hes:'', start:'', end:'', status:'pendiente', notas:'CE 3303 - 3531 — Pedidos 7061819 (3531) y 7061817 AP/AC (3303). No llegó la boutique de Citroën al 3778; el pedido de Citroën se cargó al 3303 (Peugeot) por error. El pedido facturado al 3531 tiene una caja de más que no se recibió (correspondería al 3303).' },
+    ]
+  };
+}
+function shiftDate(days){
+  const d = new Date(); d.setDate(d.getDate()+days);
+  return d.toISOString().slice(0,10);
+}
+
+const API_ENDPOINT = '/api/data';
+
+async function loadData(){
+  try{
+    const res = await fetch(API_ENDPOINT);
+    if(res.ok){
+      const value = await res.json();
+      if(value){ DATA = value; migrateData(); return; }
+    }
+  }catch(e){ console.error('Load error', e); }
+  DATA = seedData();
+  migrateData();
+  await saveData();
+}
+// Adds new optional fields to existing stored items without ever removing data.
+function migrateData(){
+  DATA.projects = DATA.projects || [];
+  DATA.boutique = DATA.boutique || [];
+  DATA.projects.forEach(p=>{
+    (p.tasks||[]).forEach(t=>{
+      if(!t.updatedAt) t.updatedAt = t.start || todayISO();
+    });
+  });
+  DATA.boutique.forEach(b=>{
+    if(!b.updatedAt) b.updatedAt = b.start || todayISO();
+    if(b.rda===undefined) b.rda = '';
+    if(b.solped===undefined) b.solped = '';
+    if(b.hes===undefined) b.hes = '';
+    if(b.importe===undefined) b.importe = '';
+  });
+}
+let saveTimer=null;
+async function saveData(){
+  try{
+    const res = await fetch(API_ENDPOINT, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(DATA)
+    });
+    if(!res.ok) throw new Error('save failed');
+  }catch(e){ console.error('Storage error', e); showToast('No se pudo guardar. Reintentando…'); }
+}
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveData, 250);
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.remove('hidden');
+  clearTimeout(showToast._h);
+  showToast._h = setTimeout(()=>t.classList.add('hidden'), 2200);
+}
+
+/* ============================================================
+   HELPERS: aggregate all tasks (proyecto + boutique) for HOY
+============================================================ */
+function allItems(){
+  const items = [];
+  DATA.projects.forEach(p=>{
+    p.tasks.forEach(t=>{
+      items.push({ ...t, kind:'proyecto', projectId:p.id, projectName:p.name, color:p.color });
+    });
+  });
+  DATA.boutique.forEach(b=>{
+    items.push({ ...b, kind:b.tipo, color: b.tipo==='pedido' ? 'blue':'rose' });
+  });
+  return items;
+}
+function isOverdue(item){
+  return item.end && item.end < todayISO() && item.status !== 'completado';
+}
+const STAGNANT_DAYS = 5;
+function daysSince(iso){
+  if(!iso) return 0;
+  const d = new Date(iso+'T00:00:00');
+  return Math.floor((new Date(new Date().toDateString()) - d) / 86400000);
+}
+function isStagnant(item){
+  return item.kind==='reclamo' && item.status!=='completado' && daysSince(item.updatedAt) >= STAGNANT_DAYS;
+}
+
+/* ============================================================
+   RENDER: HOY (kanban)
+============================================================ */
+let hoyFilter = 'todos';
+let hoySearch = '';
+
+function renderHoy(){
+  const items = allItems().filter(it=>{
+    if(hoyFilter!=='todos' && it.kind!==hoyFilter) return false;
+    if(hoySearch && !(it.title||'').toLowerCase().includes(hoySearch.toLowerCase())) return false;
+    return true;
+  });
+  ['pendiente','progreso','completado'].forEach(st=>{
+    const col = document.getElementById('col-'+st);
+    const list = items.filter(i=>i.status===st);
+    document.getElementById('c'+st[0].toUpperCase()+st.slice(1)).textContent = list.length;
+    if(list.length===0){
+      col.innerHTML = `<div class="empty-state">Sin tareas acá</div>`;
+      return;
+    }
+    col.innerHTML = list.map(cardHTML).join('');
+  });
+  // stats
+  const all = allItems();
+  document.getElementById('statPend').textContent = all.filter(i=>i.status==='pendiente').length;
+  document.getElementById('statProg').textContent = all.filter(i=>i.status==='progreso').length;
+  document.getElementById('statOver').textContent = all.filter(isOverdue).length;
+  document.getElementById('cntHoy').textContent = all.filter(i=>i.status!=='completado').length;
+
+  bindCardEvents('#view-hoy');
+  bindDragEvents();
+}
+
+function tagLabel(item){
+  if(item.kind==='proyecto') return item.projectName;
+  if(item.kind==='pedido') return 'Pedido interno';
+  if(item.kind==='reclamo') return 'Reclamo';
+  return '';
+}
+function cardHTML(item){
+  const overdue = isOverdue(item);
+  const stagnant = isStagnant(item);
+  const complete = item.status==='completado';
+  const hex = COLOR_HEX[item.color] || COLOR_HEX.amber;
+  return `
+  <div class="card ${overdue?'overdue':''} ${complete?'is-complete':''}" draggable="true" data-id="${item.id}" data-kind="${item.kind}" data-project="${item.projectId||''}">
+    <span class="card-tag" style="background:${hex}22; color:${hex};">${escapeHTML(tagLabel(item))}</span>
+    ${stagnant ? `<span class="stagnant-badge" title="Sin movimiento hace ${daysSince(item.updatedAt)} días">⚠ Estancado ${daysSince(item.updatedAt)}d</span>` : ''}
+    <div class="card-title">${escapeHTML(item.title)}</div>
+    ${item.importe ? `<div class="card-importe">${escapeHTML(item.importe)}</div>` : ''}
+    <div class="card-meta">
+      <span class="card-resp"><span class="avatar">${initials(item.responsible)}</span>${escapeHTML((item.responsible||'Sin asignar').split(' ')[0])}</span>
+      <span class="card-date ${overdue?'overdue-text':''}">${fmtDate(item.end)}</span>
+    </div>
+  </div>`;
+}
+function escapeHTML(s){
+  return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function bindCardEvents(scope){
+  document.querySelectorAll(scope+' .card').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const id = el.dataset.id, kind = el.dataset.kind, projectId = el.dataset.project;
+      if(kind==='proyecto') openTaskModal(projectId, id);
+      else openBoutiqueModal(kind, id);
+    });
+  });
+}
+
+function bindDragEvents(){
+  document.querySelectorAll('.card[draggable=true]').forEach(card=>{
+    card.addEventListener('dragstart', e=>{
+      e.dataTransfer.setData('text/plain', JSON.stringify({id:card.dataset.id, kind:card.dataset.kind, projectId:card.dataset.project}));
+    });
+  });
+  document.querySelectorAll('.kcol').forEach(col=>{
+    col.addEventListener('dragover', e=>{ e.preventDefault(); col.classList.add('dragover'); });
+    col.addEventListener('dragleave', ()=> col.classList.remove('dragover'));
+    col.addEventListener('drop', e=>{
+      e.preventDefault(); col.classList.remove('dragover');
+      const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+      const newStatus = col.dataset.status;
+      setStatus(data, newStatus);
+    });
+  });
+}
+function setStatus(ref, newStatus){
+  if(ref.kind==='proyecto'){
+    const p = DATA.projects.find(p=>p.id===ref.projectId);
+    const t = p && p.tasks.find(t=>t.id===ref.id);
+    if(t){ t.status = newStatus; t.updatedAt = todayISO(); }
+  } else {
+    const b = DATA.boutique.find(b=>b.id===ref.id);
+    if(b){ b.status = newStatus; b.updatedAt = todayISO(); }
+  }
+  scheduleSave();
+  renderAll();
+}
+
+/* ============================================================
+   RENDER: PROYECTOS
+============================================================ */
+let openProjects = new Set();
+
+function renderProyectos(){
+  const wrap = document.getElementById('projectsList');
+  document.getElementById('cntProy').textContent = DATA.projects.reduce((a,p)=>a+p.tasks.filter(t=>t.status!=='completado').length,0);
+  if(DATA.projects.length===0){
+    wrap.innerHTML = `<div class="empty-state">Todavía no tenés proyectos. Creá el primero con "+ Nuevo proyecto".</div>`;
+    return;
+  }
+  wrap.innerHTML = DATA.projects.map(p=>{
+    const total = p.tasks.length;
+    const done = p.tasks.filter(t=>t.status==='completado').length;
+    const pct = total? Math.round(done/total*100) : 0;
+    const hex = COLOR_HEX[p.color] || COLOR_HEX.amber;
+    const isOpen = openProjects.has(p.id);
+    return `
+    <div class="proj-card ${isOpen?'open':''}" data-project="${p.id}">
+      <div class="proj-head" data-toggle="${p.id}">
+        <div class="proj-title-wrap">
+          <span class="proj-dot" style="background:${hex};"></span>
+          <span class="proj-name">${escapeHTML(p.name)}</span>
+        </div>
+        <div class="proj-stats">
+          <span>${total} tareas</span>
+          <span class="proj-progress-track"><span class="proj-progress-fill" style="width:${pct}%; background:${hex};"></span></span>
+          <span>${pct}%</span>
+          <button class="btn-ghost btn-sm" data-editproject="${p.id}" title="Editar proyecto">✎</button>
+          <span class="proj-chevron">▾</span>
+        </div>
+      </div>
+      <div class="proj-body">
+        ${ganttHTML(p)}
+        <table class="task-table">
+          <thead><tr><th class="th-handle"></th><th>Tarea</th><th>Responsable</th><th>Inicio</th><th>Fin</th><th>Estado</th></tr></thead>
+          <tbody>
+            ${p.tasks.length ? p.tasks.map(t=>`
+              <tr data-task="${t.id}" data-project="${p.id}" class="${t.status==='completado'?'row-complete':''}" draggable="true">
+                <td class="td-handle" title="Arrastrá para reordenar">⠿</td>
+                <td>${escapeHTML(t.title)}</td>
+                <td>${escapeHTML(t.responsible||'—')}</td>
+                <td>${fmtDate(t.start)}</td>
+                <td>${fmtDate(t.end)}</td>
+                <td><span class="status-pill ${t.status}">${statusLabel(t.status)}</span></td>
+              </tr>`).join('') : `<tr><td colspan="6" style="color:var(--text-faint); text-align:center; padding:14px;">Sin tareas todavía</td></tr>`}
+          </tbody>
+        </table>
+        <div class="add-project-row" style="justify-content:flex-start; margin-top:12px;">
+          <button class="btn btn-sm" data-addtask="${p.id}">+ Agregar tarea</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // bind toggles
+  wrap.querySelectorAll('[data-toggle]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(e.target.closest('[data-editproject]')) return;
+      const id = el.dataset.toggle;
+      if(openProjects.has(id)) openProjects.delete(id); else openProjects.add(id);
+      renderProyectos();
+    });
+  });
+  wrap.querySelectorAll('[data-editproject]').forEach(el=>{
+    el.addEventListener('click', e=>{ e.stopPropagation(); openProjectModal(el.dataset.editproject); });
+  });
+  wrap.querySelectorAll('[data-addtask]').forEach(el=>{
+    el.addEventListener('click', ()=> openTaskModal(el.dataset.addtask, null));
+  });
+  wrap.querySelectorAll('tr[data-task]').forEach(tr=>{
+    tr.addEventListener('click', (e)=>{
+      if(e.target.closest('.td-handle')) return;
+      openTaskModal(tr.dataset.project, tr.dataset.task);
+    });
+  });
+  bindTaskReorder(wrap);
+}
+
+function statusLabel(s){ return {pendiente:'Pendiente', progreso:'En progreso', completado:'Completado'}[s] || s; }
+
+function bindTaskReorder(wrap){
+  let dragTaskId = null, dragProjectId = null;
+  wrap.querySelectorAll('tr[data-task]').forEach(tr=>{
+    tr.addEventListener('dragstart', e=>{
+      dragTaskId = tr.dataset.task; dragProjectId = tr.dataset.project;
+      tr.classList.add('row-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      try{ e.dataTransfer.setData('text/plain', dragTaskId); }catch(err){}
+    });
+    tr.addEventListener('dragend', ()=>{
+      tr.classList.remove('row-dragging');
+      wrap.querySelectorAll('tr[data-task]').forEach(r=> r.classList.remove('drop-before','drop-after'));
+    });
+    tr.addEventListener('dragover', e=>{
+      if(tr.dataset.project !== dragProjectId || tr.dataset.task === dragTaskId) return;
+      e.preventDefault();
+      const rect = tr.getBoundingClientRect();
+      const before = (e.clientY - rect.top) < rect.height/2;
+      wrap.querySelectorAll('tr[data-task]').forEach(r=> r.classList.remove('drop-before','drop-after'));
+      tr.classList.add(before ? 'drop-before' : 'drop-after');
+    });
+    tr.addEventListener('drop', e=>{
+      if(tr.dataset.project !== dragProjectId || tr.dataset.task === dragTaskId) return;
+      e.preventDefault();
+      const rect = tr.getBoundingClientRect();
+      const before = (e.clientY - rect.top) < rect.height/2;
+      const p = DATA.projects.find(pr=>pr.id===dragProjectId);
+      if(!p) return;
+      const fromIdx = p.tasks.findIndex(t=>t.id===dragTaskId);
+      let toIdx = p.tasks.findIndex(t=>t.id===tr.dataset.task);
+      if(fromIdx===-1 || toIdx===-1) return;
+      const [moved] = p.tasks.splice(fromIdx,1);
+      if(toIdx > fromIdx) toIdx -= 1;
+      const insertAt = before ? toIdx : toIdx+1;
+      p.tasks.splice(insertAt, 0, moved);
+      scheduleSave();
+      renderProyectos();
+    });
+  });
+}
+
+function ganttHTML(p){
+  if(p.tasks.length===0) return '';
+  const starts = p.tasks.map(t=>new Date(t.start||todayISO()));
+  const ends = p.tasks.map(t=>new Date(t.end||t.start||todayISO()));
+  let min = new Date(Math.min(...starts));
+  let max = new Date(Math.max(...ends));
+  min.setDate(min.getDate()-2); max.setDate(max.getDate()+2);
+  const span = Math.max(1, (max-min)/86400000);
+  const todayPct = Math.min(100, Math.max(0, ((new Date()-min)/86400000)/span*100));
+
+  // month markers
+  const months = [];
+  let cursor = new Date(min.getFullYear(), min.getMonth(), 1);
+  while(cursor <= max){
+    const pct = Math.max(0,((cursor-min)/86400000)/span*100);
+    months.push({label: cursor.toLocaleDateString('es-AR',{month:'short'}).replace('.',''), pct});
+    cursor.setMonth(cursor.getMonth()+1);
+  }
+  const hex = COLOR_HEX[p.color] || COLOR_HEX.amber;
+
+  const rows = p.tasks.map(t=>{
+    const s = new Date(t.start||todayISO()), e = new Date(t.end||t.start||todayISO());
+    const left = Math.max(0,((s-min)/86400000)/span*100);
+    const width = Math.max(1.5, ((e-s)/86400000)/span*100);
+    const barColor = t.status==='completado' ? COLOR_HEX.teal : (t.status==='progreso'? hex : '#D9D2BE');
+    return `<div class="gantt-row">
+      <div class="gantt-label" title="${escapeHTML(t.title)}">${escapeHTML(t.title)}</div>
+      <div class="gantt-track">
+        <div class="gantt-bar" style="left:${left}%; width:${width}%; background:${barColor};"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<div class="gantt-wrap"><div class="gantt">
+    <div class="gantt-months">
+      <div style="width:150px; flex-shrink:0;"></div>
+      <div style="flex:1; position:relative; height:14px;">
+        ${months.map(m=>`<span style="position:absolute; left:${m.pct}%;">${m.label}</span>`).join('')}
+      </div>
+    </div>
+    <div style="position:relative;">
+      <div class="gantt-today" style="left:calc(150px + (100% - 150px) * ${todayPct/100});"></div>
+      ${rows}
+    </div>
+  </div></div>`;
+}
+
+/* ============================================================
+   RENDER: BOUTIQUE
+============================================================ */
+function renderBoutique(){
+  ['pedido','reclamo'].forEach(tipo=>{
+    const col = document.getElementById('bt-'+tipo);
+    const list = DATA.boutique.filter(b=>b.tipo===tipo).sort((a,b)=> (a.status==='completado'?1:0) - (b.status==='completado'?1:0));
+    if(list.length===0){
+      col.innerHTML = `<div class="empty-state">Nada cargado todavía</div>`;
+    } else {
+      col.innerHTML = list.map(b=>cardHTML({...b, kind:tipo, color: tipo==='pedido'?'blue':'rose'})).join('');
+    }
+  });
+  document.getElementById('cntBou').textContent = DATA.boutique.filter(b=>b.status!=='completado').length;
+  bindCardEvents('#view-boutique');
+}
+
+/* ============================================================
+   MODALS
+============================================================ */
+function openModalRaw(html){
+  document.getElementById('modal').innerHTML = html;
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+function closeModal(){
+  document.getElementById('modalOverlay').classList.add('hidden');
+  editingId = null;
+}
+document.getElementById('modalOverlay').addEventListener('click', e=>{
+  if(e.target.id==='modalOverlay') closeModal();
+});
+
+function projectOptionsHTML(selected){
+  return DATA.projects.map(p=>`<option value="${p.id}" ${p.id===selected?'selected':''}>${escapeHTML(p.name)}</option>`).join('');
+}
+
+// ---- Quick add (from "Hoy") ----
+function openQuickAddModal(){
+  openModalRaw(`
+    <h2>Nueva tarea</h2>
+    <div class="field">
+      <label>Tipo</label>
+      <select id="qa-tipo">
+        <option value="proyecto">Tarea de proyecto</option>
+        <option value="pedido">Pedido interno de boutique</option>
+        <option value="reclamo">Reclamo de boutique</option>
+      </select>
+    </div>
+    <div class="field" id="qa-project-field">
+      <label>Proyecto</label>
+      <select id="qa-project">${projectOptionsHTML()}</select>
+    </div>
+    <div class="field"><label>Título</label><input id="qa-title" placeholder="Ej: Coordinar envío a concesionario"></div>
+    <div class="field-row">
+      <div class="field"><label>Responsable</label><input id="qa-resp" placeholder="Nombre"></div>
+      <div class="field"><label>Estado</label>
+        <select id="qa-status"><option value="pendiente">Pendiente</option><option value="progreso">En progreso</option><option value="completado">Completado</option></select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Inicio</label><input type="date" id="qa-start" value="${todayISO()}"></div>
+      <div class="field"><label>Fin</label><input type="date" id="qa-end" value="${todayISO()}"></div>
+    </div>
+    <div class="modal-actions">
+      <span></span>
+      <div class="modal-actions-right">
+        <button class="btn btn-ghost" id="qa-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="qa-save">Guardar</button>
+      </div>
+    </div>
+  `);
+  const tipoSel = document.getElementById('qa-tipo');
+  const projField = document.getElementById('qa-project-field');
+  function syncProjField(){ projField.style.display = tipoSel.value==='proyecto' ? '' : 'none'; }
+  tipoSel.addEventListener('change', syncProjField); syncProjField();
+  if(DATA.projects.length===0){ tipoSel.value='pedido'; syncProjField(); }
+
+  document.getElementById('qa-cancel').addEventListener('click', closeModal);
+  document.getElementById('qa-save').addEventListener('click', ()=>{
+    const title = document.getElementById('qa-title').value.trim();
+    if(!title){ showToast('Ponele un título a la tarea'); return; }
+    const tipo = tipoSel.value;
+    const base = {
+      id: uid(),
+      title,
+      responsible: document.getElementById('qa-resp').value.trim(),
+      status: document.getElementById('qa-status').value,
+      start: document.getElementById('qa-start').value,
+      end: document.getElementById('qa-end').value,
+    };
+    if(tipo==='proyecto'){
+      const pid = document.getElementById('qa-project').value;
+      const p = DATA.projects.find(p=>p.id===pid);
+      if(!p){ showToast('Creá un proyecto primero'); return; }
+      p.tasks.push(base);
+    } else {
+      DATA.boutique.push({...base, tipo, area:'', notas:''});
+    }
+    scheduleSave(); closeModal(); renderAll();
+    showToast('Tarea agregada');
+  });
+}
+
+// ---- Task modal (project task, create/edit) ----
+function openTaskModal(projectId, taskId){
+  const p = DATA.projects.find(p=>p.id===projectId);
+  if(!p) return;
+  const t = taskId ? p.tasks.find(t=>t.id===taskId) : null;
+  openModalRaw(`
+    <h2>${t? 'Editar tarea':'Nueva tarea'} — ${escapeHTML(p.name)}</h2>
+    <div class="field"><label>Título</label><input id="tm-title" value="${t?escapeHTML(t.title):''}" placeholder="Título de la tarea"></div>
+    <div class="field-row">
+      <div class="field"><label>Responsable</label><input id="tm-resp" value="${t?escapeHTML(t.responsible||''):''}"></div>
+      <div class="field"><label>Estado</label>
+        <select id="tm-status">
+          <option value="pendiente" ${t&&t.status==='pendiente'?'selected':''}>Pendiente</option>
+          <option value="progreso" ${t&&t.status==='progreso'?'selected':''}>En progreso</option>
+          <option value="completado" ${t&&t.status==='completado'?'selected':''}>Completado</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Inicio</label><input type="date" id="tm-start" value="${t?t.start:todayISO()}"></div>
+      <div class="field"><label>Fin</label><input type="date" id="tm-end" value="${t?t.end:todayISO()}"></div>
+    </div>
+    <div class="modal-actions">
+      ${t? `<button class="btn btn-danger btn-sm" id="tm-delete">Eliminar</button>` : `<span></span>`}
+      <div class="modal-actions-right">
+        <button class="btn btn-ghost" id="tm-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="tm-save">Guardar</button>
+      </div>
+    </div>
+  `);
+  document.getElementById('tm-cancel').addEventListener('click', closeModal);
+  if(t){
+    document.getElementById('tm-delete').addEventListener('click', ()=>{
+      p.tasks = p.tasks.filter(x=>x.id!==t.id);
+      scheduleSave(); closeModal(); renderAll(); showToast('Tarea eliminada');
+    });
+  }
+  document.getElementById('tm-save').addEventListener('click', ()=>{
+    const title = document.getElementById('tm-title').value.trim();
+    if(!title){ showToast('Ponele un título a la tarea'); return; }
+    const payload = {
+      title,
+      responsible: document.getElementById('tm-resp').value.trim(),
+      status: document.getElementById('tm-status').value,
+      start: document.getElementById('tm-start').value,
+      end: document.getElementById('tm-end').value,
+      updatedAt: todayISO(),
+    };
+    if(t){ Object.assign(t, payload); } else { p.tasks.push({id: uid(), ...payload}); }
+    scheduleSave(); closeModal(); renderAll(); showToast('Guardado');
+  });
+}
+
+// ---- Project modal (create/edit) ----
+function openProjectModal(projectId){
+  const p = projectId ? DATA.projects.find(p=>p.id===projectId) : null;
+  openModalRaw(`
+    <h2>${p? 'Editar proyecto':'Nuevo proyecto'}</h2>
+    <div class="field"><label>Nombre del proyecto</label><input id="pm-name" value="${p?escapeHTML(p.name):''}" placeholder="Ej: Lanzamiento Boutique Jeep"></div>
+    <div class="field">
+      <label>Color</label>
+      <div style="display:flex; gap:8px;">
+        ${PROJECT_COLORS.map(c=>`<div data-color="${c}" style="width:28px;height:28px;border-radius:50%; background:${COLOR_HEX[c]}; cursor:pointer; border:2px solid ${p&&p.color===c?'#fff':'transparent'};"></div>`).join('')}
+      </div>
+    </div>
+    <div class="modal-actions">
+      ${p? `<button class="btn btn-danger btn-sm" id="pm-delete">Eliminar proyecto</button>` : `<span></span>`}
+      <div class="modal-actions-right">
+        <button class="btn btn-ghost" id="pm-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="pm-save">Guardar</button>
+      </div>
+    </div>
+  `);
+  let chosenColor = p ? p.color : PROJECT_COLORS[DATA.projects.length % PROJECT_COLORS.length];
+  document.querySelectorAll('[data-color]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      chosenColor = el.dataset.color;
+      document.querySelectorAll('[data-color]').forEach(x=>x.style.border='2px solid transparent');
+      el.style.border = '2px solid #fff';
+    });
+  });
+  document.getElementById('pm-cancel').addEventListener('click', closeModal);
+  if(p){
+    document.getElementById('pm-delete').addEventListener('click', ()=>{
+      if(!confirm('¿Eliminar este proyecto y todas sus tareas?')) return;
+      DATA.projects = DATA.projects.filter(x=>x.id!==p.id);
+      scheduleSave(); closeModal(); renderAll(); showToast('Proyecto eliminado');
+    });
+  }
+  document.getElementById('pm-save').addEventListener('click', ()=>{
+    const name = document.getElementById('pm-name').value.trim();
+    if(!name){ showToast('Ponele un nombre al proyecto'); return; }
+    if(p){ p.name = name; p.color = chosenColor; }
+    else { DATA.projects.push({id: uid(), name, color: chosenColor, tasks: []}); }
+    scheduleSave(); closeModal(); renderAll(); showToast('Guardado');
+  });
+}
+
+// ---- Boutique modal (create/edit) ----
+function openBoutiqueModal(tipo, id){
+  const b = id ? DATA.boutique.find(x=>x.id===id) : null;
+  const label = tipo==='pedido' ? 'Pedido interno' : 'Reclamo';
+  openModalRaw(`
+    <h2>${b? 'Editar':'Nuevo'} — ${label}</h2>
+    <div class="field"><label>Título</label><input id="bm-title" value="${b?escapeHTML(b.title):''}" placeholder="Descripción breve"></div>
+    <div class="field-row">
+      <div class="field"><label>Responsable</label><input id="bm-resp" value="${b?escapeHTML(b.responsible||''):''}"></div>
+      <div class="field"><label>Área</label><input id="bm-area" value="${b?escapeHTML(b.area||''):''}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>RDA</label><input id="bm-rda" value="${b?escapeHTML(b.rda||''):''}" placeholder="—"></div>
+      <div class="field"><label>SOLPED</label><input id="bm-solped" value="${b?escapeHTML(b.solped||''):''}" placeholder="—"></div>
+    </div>
+    <div class="field"><label>HES</label><input id="bm-hes" value="${b?escapeHTML(b.hes||''):''}" placeholder="—"></div>
+    <div class="field"><label>Importe</label><input id="bm-importe" value="${b?escapeHTML(b.importe||''):''}" placeholder="Ej: $ 145.000" inputmode="decimal"></div>
+    <div class="field-row">
+      <div class="field"><label>Inicio</label><input type="date" id="bm-start" value="${b?b.start:todayISO()}"></div>
+      <div class="field"><label>Fin / vencimiento</label><input type="date" id="bm-end" value="${b?b.end:todayISO()}"></div>
+    </div>
+    <div class="field"><label>Estado</label>
+      <select id="bm-status">
+        <option value="pendiente" ${b&&b.status==='pendiente'?'selected':''}>Pendiente</option>
+        <option value="progreso" ${b&&b.status==='progreso'?'selected':''}>En progreso</option>
+        <option value="completado" ${b&&b.status==='completado'?'selected':''}>Completado</option>
+      </select>
+    </div>
+    <div class="field"><label>Notas</label><textarea id="bm-notas" rows="2">${b?escapeHTML(b.notas||''):''}</textarea></div>
+    <div class="modal-actions">
+      ${b? `<button class="btn btn-danger btn-sm" id="bm-delete">Eliminar</button>` : `<span></span>`}
+      <div class="modal-actions-right">
+        <button class="btn btn-ghost" id="bm-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="bm-save">Guardar</button>
+      </div>
+    </div>
+  `);
+  document.getElementById('bm-cancel').addEventListener('click', closeModal);
+  if(b){
+    document.getElementById('bm-delete').addEventListener('click', ()=>{
+      DATA.boutique = DATA.boutique.filter(x=>x.id!==b.id);
+      scheduleSave(); closeModal(); renderAll(); showToast('Eliminado');
+    });
+  }
+  document.getElementById('bm-save').addEventListener('click', ()=>{
+    const title = document.getElementById('bm-title').value.trim();
+    if(!title){ showToast('Ponele un título'); return; }
+    const payload = {
+      title,
+      responsible: document.getElementById('bm-resp').value.trim(),
+      area: document.getElementById('bm-area').value.trim(),
+      rda: document.getElementById('bm-rda').value.trim(),
+      solped: document.getElementById('bm-solped').value.trim(),
+      hes: document.getElementById('bm-hes').value.trim(),
+      importe: document.getElementById('bm-importe').value.trim(),
+      start: document.getElementById('bm-start').value,
+      end: document.getElementById('bm-end').value,
+      status: document.getElementById('bm-status').value,
+      notas: document.getElementById('bm-notas').value.trim(),
+      updatedAt: todayISO(),
+    };
+    if(b){ Object.assign(b, payload); } else { DATA.boutique.push({id: uid(), tipo, ...payload}); }
+    scheduleSave(); closeModal(); renderAll(); showToast('Guardado');
+  });
+}
+
+/* ============================================================
+   EXPORT TO EXCEL
+============================================================ */
+/* ============================================================
+   EXPORT TO EXCEL — replica la estética del Gantt original
+============================================================ */
+function argb(hex){ return 'FF'+hex.replace('#','').toUpperCase(); }
+const STATUS_FILL = { pendiente:'E6E1D2', progreso:'F3E3D6', completado:'DEF3E2' };
+const STATUS_FONT  = { pendiente:'79705D', progreso:'C9683F', completado:'1E6B37' };
+const HEADER_FILL_DEFAULT = '2B261E';
+
+function safeSheetName(name){
+  return name.replace(/[:\\/?*\[\]]/g, '').slice(0,31);
+}
+
+function styleTitleRow(ws, rowNum, text, span, fillHex){
+  ws.mergeCells(rowNum,1,rowNum,span);
+  const cell = ws.getCell(rowNum,1);
+  cell.value = text;
+  cell.font = { bold:true, size:15, color:{argb:'FFFFFFFF'} };
+  cell.alignment = { vertical:'middle', horizontal:'left', indent:1 };
+  cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb: argb(fillHex)} };
+  ws.getRow(rowNum).height = 26;
+}
+
+function styleMetaRow(ws, rowNum, area, periodo, avancePct, span){
+  ws.mergeCells(rowNum,1,rowNum,Math.max(2,Math.floor(span/3)));
+  ws.getCell(rowNum,1).value = `Área: ${area}`;
+  const c2start = Math.floor(span/3)+1;
+  ws.mergeCells(rowNum,c2start,rowNum,c2start+1);
+  ws.getCell(rowNum,c2start).value = `Período: ${periodo}`;
+  const c3start = c2start+2;
+  ws.mergeCells(rowNum,c3start,rowNum,span);
+  const avanceCell = ws.getCell(rowNum,c3start);
+  avanceCell.value = `Avance global: ${avancePct}%`;
+  const avanceColor = avancePct>=80 ? '1E6B37' : (avancePct>=40 ? 'C9683F' : '79705D');
+  avanceCell.font = { bold:true, size:10, color:{argb: argb('#'+avanceColor)} };
+  for(let c=1;c<=span;c++){
+    if(c!==c3start) ws.getCell(rowNum,c).font = { italic:true, size:10, color:{argb:'FF79705D'} };
+    ws.getCell(rowNum,c).fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFF3EFE4'} };
+  }
+  ws.getCell(rowNum,c3start).alignment = { horizontal:'right' };
+  ws.getRow(rowNum).height = 18;
+}
+
+function styleHeaderRow(ws, rowNum, headers, fillHex){
+  headers.forEach((h,i)=>{
+    const cell = ws.getCell(rowNum, i+1);
+    cell.value = h;
+    cell.font = { bold:true, size:10.5, color:{argb:'FFFFFFFF'} };
+    cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb: argb(fillHex)} };
+    cell.alignment = { vertical:'middle' };
+    cell.border = { bottom:{style:'thin', color:{argb:'FFFFFFFF'}} };
+  });
+  ws.getRow(rowNum).height = 20;
+}
+
+function styleDataRow(ws, rowNum, values, status){
+  values.forEach((v,i)=>{
+    const cell = ws.getCell(rowNum, i+1);
+    cell.value = v;
+    cell.font = { size:10.5, color:{argb:'FF2B261E'} };
+    cell.alignment = { vertical:'middle', wrapText:true };
+  });
+  const lastCol = values.length;
+  const statusCell = ws.getCell(rowNum, lastCol); // último valor = estado
+  statusCell.fill = { type:'pattern', pattern:'solid', fgColor:{argb: argb('#'+(STATUS_FILL[status]||'E6E1D2'))} };
+  statusCell.font = { bold:true, size:10, color:{argb: argb('#'+(STATUS_FONT[status]||'79705D'))} };
+  statusCell.alignment = { vertical:'middle', horizontal:'center' };
+}
+
+function buildProjectSheet(wb, p){
+  const ws = wb.addWorksheet(safeSheetName(p.name), { properties:{ tabColor:{argb: argb(COLOR_HEX[p.color]||COLOR_HEX.amber)} } });
+  const cols = 6;
+  ws.columns = [ {width:5}, {width:46}, {width:20}, {width:13}, {width:13}, {width:16} ];
+
+  const total = p.tasks.length;
+  const done = p.tasks.filter(t=>t.status==='completado').length;
+  const pct = total ? Math.round(done/total*100) : 0;
+  const dates = p.tasks.filter(t=>t.start||t.end);
+  const periodo = dates.length
+    ? `${fmtDate(dates.reduce((a,t)=> (t.start && (!a || t.start<a)) ? t.start : a, null))} → ${fmtDate(dates.reduce((a,t)=> (t.end && (!a || t.end>a)) ? t.end : a, null))}`
+    : '—';
+
+  styleTitleRow(ws, 1, '  📋  ' + p.name, cols, COLOR_HEX[p.color]||COLOR_HEX.amber);
+  styleMetaRow(ws, 2, 'Marketing Posventa — Negocios Alternativos', periodo, pct, cols);
+  ws.getRow(3).height = 6;
+  styleHeaderRow(ws, 4, ['#','TAREA / ACTIVIDAD','RESPONSABLE','INICIO','FIN','ESTADO'], COLOR_HEX[p.color]||COLOR_HEX.amber);
+
+  if(total===0){
+    ws.mergeCells(5,1,5,cols);
+    ws.getCell(5,1).value = 'Sin tareas cargadas todavía';
+    ws.getCell(5,1).font = { italic:true, color:{argb:'FFA79C83'} };
+  } else {
+    p.tasks.forEach((t,i)=>{
+      const row = 5+i;
+      styleDataRow(ws, row, [i+1, t.title, t.responsible||'—', fmtDate(t.start), fmtDate(t.end), statusLabel(t.status)], t.status);
+    });
+  }
+  ws.views = [{ state:'frozen', ySplit:4 }];
+}
+
+function buildBoutiqueSheet(wb, tipo, sheetName, colorHex){
+  const items = DATA.boutique.filter(b=>b.tipo===tipo);
+  const ws = wb.addWorksheet(safeSheetName(sheetName), { properties:{ tabColor:{argb: argb(colorHex)} } });
+  const headers = ['#','TAREA / ACTIVIDAD','RESPONSABLE','ÁREA','RDA','SOLPED','HES','IMPORTE','INICIO','FIN','ESTADO','NOTAS'];
+  ws.columns = [ {width:5},{width:38},{width:18},{width:16},{width:13},{width:12},{width:13},{width:16},{width:12},{width:12},{width:14},{width:40} ];
+
+  const total = items.length;
+  const done = items.filter(b=>b.status==='completado').length;
+  const pct = total ? Math.round(done/total*100) : 0;
+  const dates = items.filter(b=>b.start||b.end);
+  const periodo = dates.length
+    ? `${fmtDate(dates.reduce((a,b)=> (b.start && (!a || b.start<a)) ? b.start : a, null))} → ${fmtDate(dates.reduce((a,b)=> (b.end && (!a || b.end>a)) ? b.end : a, null))}`
+    : '—';
+
+  styleTitleRow(ws, 1, '  📋  ' + sheetName, headers.length, colorHex);
+  styleMetaRow(ws, 2, 'Marketing Posventa — Negocios Alternativos', periodo, pct, headers.length);
+  ws.getRow(3).height = 6;
+  styleHeaderRow(ws, 4, headers, colorHex);
+
+  if(total===0){
+    ws.mergeCells(5,1,5,headers.length);
+    ws.getCell(5,1).value = 'Sin registros todavía';
+    ws.getCell(5,1).font = { italic:true, color:{argb:'FFA79C83'} };
+  } else {
+    items.forEach((b,i)=>{
+      const row = 5+i;
+      styleDataRow(ws, row, [
+        i+1, b.title, b.responsible||'—', b.area||'—', b.rda||'—', b.solped||'—', b.hes||'—', b.importe||'—',
+        fmtDate(b.start), fmtDate(b.end), statusLabel(b.status), b.notas||''
+      ], b.status);
+    });
+  }
+  ws.views = [{ state:'frozen', ySplit:4 }];
+}
+
+function buildResumenSheet(wb){
+  const ws = wb.addWorksheet('📊 RESUMEN', { properties:{ tabColor:{argb: argb(COLOR_HEX.amber)} } });
+  ws.columns = [ {width:32},{width:10},{width:10},{width:10},{width:10},{width:22} ];
+  styleTitleRow(ws, 1, '  📊  Resumen general — Tablero PV', 6, COLOR_HEX.amber);
+  ws.getRow(2).height = 6;
+  styleHeaderRow(ws, 3, ['Proyecto / Área','Total','Pend.','En curso','Compl.','Avance'], COLOR_HEX.amber);
+
+  let row = 4;
+  const addLine = (name, tasks)=>{
+    const total = tasks.length;
+    const done = tasks.filter(t=>t.status==='completado').length;
+    const prog = tasks.filter(t=>t.status==='progreso').length;
+    const pend = tasks.filter(t=>t.status==='pendiente').length;
+    const pct = total? done/total : 0;
+    ws.getCell(row,1).value = name;
+    ws.getCell(row,2).value = total;
+    ws.getCell(row,3).value = pend;
+    ws.getCell(row,4).value = prog;
+    ws.getCell(row,5).value = done;
+    const avCell = ws.getCell(row,6);
+    const pctInt = Math.round(pct*100);
+    avCell.value = pctInt/100;
+    avCell.numFmt = '0%';
+    const avColor = pctInt>=80 ? '1E6B37' : (pctInt>=40 ? 'C9683F' : '79705D');
+    avCell.font = { bold:true, size:10.5, color:{argb: argb('#'+avColor)} };
+    avCell.alignment = { horizontal:'center' };
+    [1,2,3,4,5].forEach(c=> ws.getCell(row,c).font = { size:10.5 });
+    row++;
+  };
+  DATA.projects.forEach(p=> addLine(p.name, p.tasks));
+  addLine('🛍️ Pedidos internos (Boutique)', DATA.boutique.filter(b=>b.tipo==='pedido'));
+  addLine('RECLAMOS (Boutique)', DATA.boutique.filter(b=>b.tipo==='reclamo'));
+  ws.views = [{ state:'frozen', ySplit:3 }];
+}
+
+async function exportExcel(){
+  showToast('Generando Excel…');
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Tablero PV';
+  wb.created = new Date();
+
+  buildResumenSheet(wb);
+  DATA.projects.forEach(p=> buildProjectSheet(wb, p));
+  buildBoutiqueSheet(wb, 'pedido', '🛍️ Pedidos internos', COLOR_HEX.blue);
+  buildBoutiqueSheet(wb, 'reclamo', 'RECLAMOS', COLOR_HEX.violet);
+
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `tablero-pv-${todayISO()}.xlsx`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Excel descargado');
+}
+
+/* ============================================================
+   ASISTENTE IA
+============================================================ */
+let chatHistory = []; // {role, content}
+
+function buildContextSummary(){
+  const today = todayISO();
+  const lines = [];
+  lines.push(`Fecha de hoy: ${today}`);
+  lines.push('\nPROYECTOS:');
+  DATA.projects.forEach(p=>{
+    lines.push(`· ${p.name}`);
+    p.tasks.forEach(t=>{
+      const overdue = isOverdue(t) ? ' [VENCIDA]' : '';
+      lines.push(`  - ${t.title} | responsable: ${t.responsible||'sin asignar'} | estado: ${statusLabel(t.status)} | inicio: ${t.start} | fin: ${t.end}${overdue}`);
+    });
+    if(p.tasks.length===0) lines.push('  (sin tareas cargadas)');
+  });
+  lines.push('\nBOUTIQUE — PEDIDOS INTERNOS:');
+  DATA.boutique.filter(b=>b.tipo==='pedido').forEach(b=>{
+    const overdue = isOverdue(b) ? ' [VENCIDO]' : '';
+    lines.push(`· ${b.title} | responsable: ${b.responsible||'sin asignar'} | área: ${b.area||'-'} | RDA: ${b.rda||'-'} | SOLPED: ${b.solped||'-'} | HES: ${b.hes||'-'} | importe: ${b.importe||'-'} | estado: ${statusLabel(b.status)} | inicio: ${b.start||'-'} | fin: ${b.end||'-'}${overdue}${b.notas?` | notas: ${b.notas}`:''}`);
+  });
+  lines.push('\nBOUTIQUE — RECLAMOS:');
+  DATA.boutique.filter(b=>b.tipo==='reclamo').forEach(b=>{
+    const overdue = isOverdue(b) ? ' [VENCIDO]' : '';
+    const stagnant = isStagnant(b) ? ` [SIN MOVIMIENTO HACE ${daysSince(b.updatedAt)} DÍAS]` : '';
+    lines.push(`· ${b.title} | responsable: ${b.responsible||'sin asignar'} | área: ${b.area||'-'} | RDA: ${b.rda||'-'} | SOLPED: ${b.solped||'-'} | HES: ${b.hes||'-'} | importe: ${b.importe||'-'} | estado: ${statusLabel(b.status)} | inicio: ${b.start||'-'} | fin: ${b.end||'-'}${overdue}${stagnant}${b.notas?` | notas: ${b.notas}`:''}`);
+  });
+  return lines.join('\n');
+}
+
+function renderChat(){
+  const box = document.getElementById('chatMessages');
+  if(chatHistory.length===0){
+    box.innerHTML = `<div class="chat-empty">
+      <div class="chat-empty-mark">✦</div>
+      <p>Preguntame lo que necesites sobre tu tablero — qué priorizar, qué está por vencer, o pedime que te redacte un mensaje.</p>
+      <p class="chat-empty-note">Leo el estado actual de tus proyectos y boutique en cada consulta.</p>
+    </div>`;
+    return;
+  }
+  box.innerHTML = chatHistory.map(m=>
+    `<div class="chat-bubble ${m.role==='user'?'user':'assistant'} ${m.loading?'loading':''}">${escapeHTML(m.content)}</div>`
+  ).join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+async function sendChat(promptOverride){
+  const input = document.getElementById('chatInput');
+  const text = (promptOverride || input.value).trim();
+  if(!text) return;
+  chatHistory.push({role:'user', content:text});
+  input.value = '';
+  autoResize(input);
+  renderChat();
+
+  const contextSummary = buildContextSummary();
+  const fullPrompt = `Sos mi asistente de organización de Marketing Posventa (Stellantis). Respondé en español rioplatense, directo y accionable. Usá esta info de mi tablero como fuente de verdad, no inventes datos que no estén:\n\n${contextSummary}\n\n---\nMi consulta: ${text}`;
+
+  try{
+    await navigator.clipboard.writeText(fullPrompt);
+    chatHistory.push({role:'assistant', content:'✅ Copiado al portapapeles con el estado actual de tu tablero. Se abrió una pestaña de Claude — pegalo ahí (Ctrl/Cmd+V) y enviá.'});
+    window.open('https://claude.ai/new', '_blank');
+  }catch(e){
+    chatHistory.push({role:'assistant', content:'No pude copiar automáticamente. Copiá este texto a mano y pegalo en Claude:\n\n'+fullPrompt});
+  }
+  renderChat();
+}
+
+function autoResize(el){
+  el.style.height = 'auto';
+  el.style.height = Math.min(120, el.scrollHeight) + 'px';
+}
+
+document.getElementById('chatSend').addEventListener('click', ()=> sendChat());
+document.getElementById('chatInput').addEventListener('keydown', e=>{
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); }
+});
+document.getElementById('chatInput').addEventListener('input', e=> autoResize(e.target));
+document.querySelectorAll('.suggestion-chip').forEach(chip=>{
+  chip.addEventListener('click', ()=> sendChat(chip.dataset.prompt));
+});
+
+/* ============================================================
+   TABS / INIT
+============================================================ */
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach(b=> b.classList.toggle('active', b.dataset.tab===name));
+  document.querySelectorAll('.view').forEach(v=> v.classList.toggle('active', v.id==='view-'+name));
+}
+document.querySelectorAll('.tab-btn').forEach(b=>{
+  b.addEventListener('click', ()=> switchTab(b.dataset.tab));
+});
+
+document.querySelectorAll('#hoyFilters .chip').forEach(chip=>{
+  chip.addEventListener('click', ()=>{
+    document.querySelectorAll('#hoyFilters .chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    hoyFilter = chip.dataset.filter;
+    renderHoy();
+  });
+});
+document.getElementById('hoySearch').addEventListener('input', e=>{ hoySearch = e.target.value; renderHoy(); });
+document.getElementById('btnQuickAdd').addEventListener('click', openQuickAddModal);
+document.getElementById('btnNewProject').addEventListener('click', ()=> openProjectModal(null));
+document.getElementById('btnExport').addEventListener('click', exportExcel);
+document.querySelectorAll('[data-newbt]').forEach(btn=>{
+  btn.addEventListener('click', ()=> openBoutiqueModal(btn.dataset.newbt, null));
+});
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+
+function renderAll(){
+  renderHoy();
+  renderProyectos();
+  renderBoutique();
+}
+
+(async function init(){
+  document.getElementById('todayLabel').textContent = new Date().toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'long'});
+  await loadData();
+  renderAll();
+})();
+</script>
+</body>
+</html>
