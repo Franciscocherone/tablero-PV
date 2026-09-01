@@ -357,6 +357,28 @@ body{
 .chat-input-row textarea:focus{outline:none; border-color:var(--amber);}
 .ai-disclaimer{font-size:11px; color:var(--text-faint); text-align:center; padding:0 20px 16px;}
 
+/* ---------- TAREAS DIARIAS (STICKY NOTES) ---------- */
+.daily-add-row{display:flex; gap:10px; margin-bottom:18px;}
+.daily-add-row input{
+  flex:1; background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius-sm);
+  padding:10px 12px; font-family:var(--font-body); font-size:13.5px; color:var(--text);
+}
+.daily-add-row input:focus{outline:none; border-color:var(--blue);}
+.daily-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:14px;}
+.sticky-note{
+  background:var(--panel); border:1px solid var(--border-soft); border-radius:var(--radius);
+  padding:14px 14px 12px; box-shadow:var(--shadow-card); display:flex; flex-direction:column; gap:12px;
+  border-top:4px solid var(--sticky-color, var(--amber));
+}
+.sticky-note.done{background:var(--teal-dim); border-color:rgba(46,158,79,.28);}
+.sticky-note-text{font-size:13.5px; line-height:1.5; color:var(--text); white-space:pre-wrap; word-break:break-word;}
+.sticky-note.done .sticky-note-text{color:#1e6b37; text-decoration:line-through; text-decoration-color:rgba(30,107,55,.4);}
+.sticky-note-foot{display:flex; align-items:center; justify-content:space-between; font-size:11px; color:var(--text-faint); font-family:var(--font-mono);}
+.sticky-note-check{display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none;}
+.sticky-note-check input{width:15px; height:15px; accent-color:var(--teal); cursor:pointer;}
+.sticky-note-del{color:var(--text-faint); cursor:pointer; background:none; border:none; font-size:13px; padding:0;}
+.sticky-note-del:hover{color:var(--rose);}
+
 ::-webkit-scrollbar{height:8px; width:8px;}
 ::-webkit-scrollbar-thumb{background:var(--border); border-radius:8px;}
 ::-webkit-scrollbar-track{background:transparent;}
@@ -436,6 +458,7 @@ body{
       <button class="tab-btn active" data-tab="hoy">Hoy <span class="tab-count" id="cntHoy">0</span></button>
       <button class="tab-btn" data-tab="proyectos">Proyectos <span class="tab-count" id="cntProy">0</span></button>
       <button class="tab-btn" data-tab="boutique">Boutique <span class="tab-count" id="cntBou">0</span></button>
+      <button class="tab-btn" data-tab="diarias">📌 Tareas diarias <span class="tab-count" id="cntDiarias">0</span></button>
       <button class="tab-btn" data-tab="asistente">✦ Asistente IA</button>
     </div>
   </div>
@@ -475,6 +498,7 @@ body{
     <div class="toolbar">
       <div style="font-size:13px; color:var(--text-dim);">Vista Gantt por proyecto — tocá una tarjeta para expandirla</div>
       <div style="display:flex; gap:8px;">
+        <input class="search-box" id="projSearch" placeholder="Buscar por responsable…">
         <button class="btn" id="btnExport">⬇ Exportar a Excel</button>
         <button class="btn btn-primary" id="btnNewProject">+ Nuevo proyecto</button>
       </div>
@@ -518,6 +542,18 @@ body{
         <div id="bt-reclamo"></div>
       </div>
     </div>
+  </section>
+
+  <!-- ================= TAREAS DIARIAS ================= -->
+  <section class="view" id="view-diarias">
+    <div class="toolbar">
+      <div style="font-size:13px; color:var(--text-dim);">Anotá pedidos espontáneos del día a día, sin relación directa a los proyectos</div>
+    </div>
+    <div class="daily-add-row">
+      <input type="text" id="dailyInput" placeholder="Ej: Mandar presupuesto a Juan por Whatsapp…" maxlength="300">
+      <button class="btn btn-primary" id="dailyAdd">+ Agregar</button>
+    </div>
+    <div class="daily-grid" id="dailyGrid"></div>
   </section>
 
   <!-- ================= ASISTENTE IA ================= -->
@@ -676,7 +712,8 @@ function seedData(){
       { id: uid(), tipo:'reclamo', title:'Granville', responsible:'', area:'BOUTIQUE PSA', rda:'', solped:'', hes:'', start:'', end:'', status:'pendiente', notas:'' },
       { id: uid(), tipo:'reclamo', title:'Centenario — cruce de cajas', responsible:'', area:'ROPA DE TRABAJO', rda:'', solped:'', hes:'', start:'', end:'', status:'pendiente', notas:'Cruce de cajas. A la espera de que retiren por sucursales.' },
       { id: uid(), tipo:'reclamo', title:'Nave Motors — pedido mal cargado', responsible:'', area:'BOUTIQUE PSA', rda:'', solped:'', hes:'', start:'', end:'', status:'pendiente', notas:'CE 3303 - 3531 — Pedidos 7061819 (3531) y 7061817 AP/AC (3303). No llegó la boutique de Citroën al 3778; el pedido de Citroën se cargó al 3303 (Peugeot) por error. El pedido facturado al 3531 tiene una caja de más que no se recibió (correspondería al 3303).' },
-    ]
+    ],
+    dailyTasks: []
   };
 }
 function shiftDate(days){
@@ -702,10 +739,12 @@ async function loadData(){
 function migrateData(){
   DATA.projects = DATA.projects || [];
   DATA.boutique = DATA.boutique || [];
+  DATA.dailyTasks = DATA.dailyTasks || [];
   DATA.projects.forEach(p=>{
     (p.tasks||[]).forEach(t=>{
       if(!t.updatedAt) t.updatedAt = t.start || todayISO();
       if(!t.comments) t.comments = [];
+      if(!t.subtasks) t.subtasks = [];
     });
   });
   DATA.boutique.forEach(b=>{
@@ -913,22 +952,35 @@ function renderProjectsGanttOverview(){
   });
 }
 
+let projSearch = '';
+
 function renderProyectos(){
   const wrap = document.getElementById('projectsList');
+  const search = projSearch.trim().toLowerCase();
   document.getElementById('cntProy').textContent = DATA.projects.reduce((a,p)=>a+p.tasks.filter(t=>t.status!=='completado').length,0);
   renderProjectsGanttOverview();
   if(DATA.projects.length===0){
     wrap.innerHTML = `<div class="empty-state">Todavía no tenés proyectos. Creá el primero con "+ Nuevo proyecto".</div>`;
     return;
   }
-  wrap.innerHTML = DATA.projects.map(p=>{
+  const entries = DATA.projects
+    .map(p=>({ p, matchTasks: search ? p.tasks.filter(t=>(t.responsible||'').toLowerCase().includes(search)) : p.tasks }))
+    .filter(({matchTasks})=> !search || matchTasks.length>0);
+
+  if(search && entries.length===0){
+    wrap.innerHTML = `<div class="empty-state">Nadie llamado "${escapeHTML(projSearch.trim())}" tiene tareas asignadas en ningún proyecto</div>`;
+    return;
+  }
+
+  wrap.innerHTML = entries.map(({p, matchTasks})=>{
+    const tasksForView = matchTasks;
     const total = p.tasks.length;
     const done = p.tasks.filter(t=>t.status==='completado').length;
     const pct = total? Math.round(done/total*100) : 0;
     const hex = COLOR_HEX[p.color] || COLOR_HEX.amber;
-    const isOpen = openProjects.has(p.id);
+    const isOpen = search ? true : openProjects.has(p.id);
     return `
-    <div class="proj-card ${isOpen?'open':''}" data-project="${p.id}" draggable="true">
+    <div class="proj-card ${isOpen?'open':''}" data-project="${p.id}" draggable="${search?'false':'true'}">
       <div class="proj-head" data-toggle="${p.id}">
         <div class="proj-title-wrap">
           <span class="proj-drag-handle" title="Arrastrá para reordenar">⠿</span>
@@ -936,7 +988,7 @@ function renderProyectos(){
           <span class="proj-name">${escapeHTML(p.name)}</span>
         </div>
         <div class="proj-stats">
-          <span>${total} tareas</span>
+          <span>${search ? `${tasksForView.length} de ${total} tareas` : `${total} tareas`}</span>
           <span class="proj-progress-track"><span class="proj-progress-fill" style="width:${pct}%; background:${hex};"></span></span>
           <span>${pct}%</span>
           <button class="btn-ghost btn-sm" data-editproject="${p.id}" title="Editar proyecto">✎</button>
@@ -944,14 +996,14 @@ function renderProyectos(){
         </div>
       </div>
       <div class="proj-body">
-        ${ganttHTML(p)}
+        ${ganttHTML(p, tasksForView)}
         <table class="task-table">
           <thead><tr><th class="th-handle"></th><th>Tarea</th><th>Responsable</th><th>Inicio</th><th>Fin</th><th>Estado</th></tr></thead>
           <tbody>
-            ${p.tasks.length ? p.tasks.map(t=>`
-              <tr data-task="${t.id}" data-project="${p.id}" class="${t.status==='completado'?'row-complete':''}" draggable="true">
+            ${tasksForView.length ? tasksForView.map(t=>`
+              <tr data-task="${t.id}" data-project="${p.id}" class="${t.status==='completado'?'row-complete':''}" draggable="${search?'false':'true'}">
                 <td class="td-handle" title="Arrastrá para reordenar">⠿</td>
-                <td>${escapeHTML(t.title)}${t.comments && t.comments.length ? ` <span class="badge-count" title="${t.comments.length} comentario(s)">💬 ${t.comments.length}</span>` : ''}</td>
+                <td>${escapeHTML(t.title)}${t.subtasks && t.subtasks.length ? ` <span class="badge-count" title="Subtareas completadas">☑ ${t.subtasks.filter(s=>s.done).length}/${t.subtasks.length}</span>` : ''}${t.comments && t.comments.length ? ` <span class="badge-count" title="${t.comments.length} comentario(s)">💬 ${t.comments.length}</span>` : ''}</td>
                 <td>${escapeHTML(t.responsible||'—')}</td>
                 <td>${fmtDate(t.start)}</td>
                 <td>${fmtDate(t.end)}</td>
@@ -988,6 +1040,7 @@ function renderProyectos(){
       openTaskModal(tr.dataset.project, tr.dataset.task);
     });
   });
+  if(search) return;
   bindTaskReorder(wrap);
   bindProjectReorder(wrap);
 }
@@ -1120,10 +1173,11 @@ function computeGanttHTML(rows){
   </div></div>`;
 }
 
-function ganttHTML(p){
-  if(p.tasks.length===0) return '';
+function ganttHTML(p, tasks){
+  const list = tasks || p.tasks;
+  if(list.length===0) return '';
   const hex = COLOR_HEX[p.color] || COLOR_HEX.amber;
-  const rows = p.tasks.map(t=>({
+  const rows = list.map(t=>({
     label: t.title,
     start: t.start||todayISO(),
     end: t.end||t.start||todayISO(),
@@ -1211,6 +1265,64 @@ function renderBoutique(){
       const key = el.dataset.areaToggle;
       if(closedBtAreas.has(key)) closedBtAreas.delete(key); else closedBtAreas.add(key);
       renderBoutique();
+    });
+  });
+}
+
+/* ============================================================
+   RENDER: TAREAS DIARIAS (STICKY NOTES)
+============================================================ */
+const STICKY_COLORS = [COLOR_HEX.amber, COLOR_HEX.blue, COLOR_HEX.teal, COLOR_HEX.gold, COLOR_HEX.violet];
+
+function addDailyTask(text){
+  DATA.dailyTasks = DATA.dailyTasks || [];
+  DATA.dailyTasks.unshift({id: uid(), text, done:false, createdAt: new Date().toISOString()});
+  scheduleSave();
+}
+function toggleDailyTask(id){
+  const item = (DATA.dailyTasks||[]).find(d=>d.id===id);
+  if(!item) return;
+  item.done = !item.done;
+  scheduleSave();
+}
+function deleteDailyTask(id){
+  DATA.dailyTasks = (DATA.dailyTasks||[]).filter(d=>d.id!==id);
+  scheduleSave();
+}
+function renderDailyTasks(){
+  const grid = document.getElementById('dailyGrid');
+  const items = DATA.dailyTasks || [];
+  const pending = items.filter(d=>!d.done).length;
+  document.getElementById('cntDiarias').textContent = pending;
+  if(items.length===0){
+    grid.innerHTML = `<div class="empty-state">Sin notas todavía — anotá lo primero que te pidan hoy</div>`;
+    return;
+  }
+  const sorted = items.slice().sort((a,b)=> (a.done===b.done) ? 0 : (a.done ? 1 : -1));
+  grid.innerHTML = sorted.map((d,i)=>{
+    const color = STICKY_COLORS[i % STICKY_COLORS.length];
+    return `<div class="sticky-note ${d.done?'done':''}" style="--sticky-color:${color};" data-daily="${d.id}">
+      <div class="sticky-note-text">${escapeHTML(d.text)}</div>
+      <div class="sticky-note-foot">
+        <label class="sticky-note-check">
+          <input type="checkbox" data-toggledaily="${d.id}" ${d.done?'checked':''}>
+          ${d.done ? 'Hecho' : 'Marcar hecho'}
+        </label>
+        <span>${fmtDateTime(d.createdAt)}</span>
+        <button class="sticky-note-del" data-deldaily="${d.id}" title="Eliminar">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+  grid.querySelectorAll('[data-toggledaily]').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      toggleDailyTask(cb.dataset.toggledaily);
+      renderDailyTasks();
+    });
+  });
+  grid.querySelectorAll('[data-deldaily]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      deleteDailyTask(btn.dataset.deldaily);
+      renderDailyTasks();
     });
   });
 }
@@ -1353,6 +1465,69 @@ function bindCommentDeleteHandlers(projectId, taskId){
   });
 }
 
+// ---- Task subtasks ----
+function addTaskSubtask(projectId, taskId, title){
+  const p = DATA.projects.find(p=>p.id===projectId);
+  const t = p && p.tasks.find(t=>t.id===taskId);
+  if(!t) return;
+  if(!t.subtasks) t.subtasks = [];
+  t.subtasks.push({id: uid(), title, done:false, note:''});
+  scheduleSave();
+}
+function toggleTaskSubtask(projectId, taskId, subtaskId){
+  const p = DATA.projects.find(p=>p.id===projectId);
+  const t = p && p.tasks.find(t=>t.id===taskId);
+  const s = t && (t.subtasks||[]).find(s=>s.id===subtaskId);
+  if(!s) return;
+  s.done = !s.done;
+  scheduleSave();
+}
+function updateTaskSubtaskNote(projectId, taskId, subtaskId, note){
+  const p = DATA.projects.find(p=>p.id===projectId);
+  const t = p && p.tasks.find(t=>t.id===taskId);
+  const s = t && (t.subtasks||[]).find(s=>s.id===subtaskId);
+  if(!s) return;
+  s.note = note;
+  scheduleSave();
+}
+function deleteTaskSubtask(projectId, taskId, subtaskId){
+  const p = DATA.projects.find(p=>p.id===projectId);
+  const t = p && p.tasks.find(t=>t.id===taskId);
+  if(!t) return;
+  t.subtasks = (t.subtasks||[]).filter(s=>s.id!==subtaskId);
+  scheduleSave();
+}
+function refreshTaskSubtasks(projectId, taskId){
+  const p = DATA.projects.find(p=>p.id===projectId);
+  const t = p && p.tasks.find(t=>t.id===taskId);
+  if(!t) return;
+  const box = document.getElementById('tm-subtasks');
+  if(box) box.innerHTML = renderSubtasksHTML(t.subtasks||[]);
+  const progress = document.getElementById('tm-subtasks-progress');
+  if(progress) progress.textContent = subtaskProgressLabel(t.subtasks||[]);
+  bindTaskSubtaskHandlers(projectId, taskId);
+  renderAll();
+}
+function bindTaskSubtaskHandlers(projectId, taskId){
+  document.querySelectorAll('#tm-subtasks [data-togglesubtask]').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      toggleTaskSubtask(projectId, taskId, cb.dataset.togglesubtask);
+      refreshTaskSubtasks(projectId, taskId);
+    });
+  });
+  document.querySelectorAll('#tm-subtasks [data-notesubtask]').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      updateTaskSubtaskNote(projectId, taskId, inp.dataset.notesubtask, inp.value.trim());
+    });
+  });
+  document.querySelectorAll('#tm-subtasks [data-delsubtask]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      deleteTaskSubtask(projectId, taskId, btn.dataset.delsubtask);
+      refreshTaskSubtasks(projectId, taskId);
+    });
+  });
+}
+
 // ---- Task modal (project task, create/edit) ----
 function openTaskModal(projectId, taskId){
   const p = DATA.projects.find(p=>p.id===projectId);
@@ -1377,6 +1552,15 @@ function openTaskModal(projectId, taskId){
     </div>
     ${t ? `
     <div class="field">
+      <label>Subtareas <span id="tm-subtasks-progress" style="font-weight:400; text-transform:none; letter-spacing:0;">${subtaskProgressLabel(t.subtasks||[])}</span></label>
+      <div class="subtask-list" id="tm-subtasks">${renderSubtasksHTML(t.subtasks||[])}</div>
+      <div class="subtask-add-row">
+        <input type="text" id="tm-subtask-input" placeholder="Nueva subtarea…">
+        <button class="btn btn-sm" id="tm-subtask-add">+ Agregar</button>
+      </div>
+    </div>` : ''}
+    ${t ? `
+    <div class="field">
       <label>Comentarios <span id="tm-comments-count" style="font-weight:400; text-transform:none; letter-spacing:0;">${t.comments && t.comments.length ? `(${t.comments.length})` : ''}</span></label>
       <div class="comment-list" id="tm-comments">${renderCommentsHTML(t.comments||[])}</div>
       <div class="comment-add-row">
@@ -1397,6 +1581,15 @@ function openTaskModal(projectId, taskId){
     document.getElementById('tm-delete').addEventListener('click', ()=>{
       p.tasks = p.tasks.filter(x=>x.id!==t.id);
       scheduleSave(); closeModal(); renderAll(); showToast('Tarea eliminada');
+    });
+    bindTaskSubtaskHandlers(projectId, t.id);
+    document.getElementById('tm-subtask-add').addEventListener('click', ()=>{
+      const input = document.getElementById('tm-subtask-input');
+      const val = input.value.trim();
+      if(!val) return;
+      addTaskSubtask(projectId, t.id, val);
+      input.value = '';
+      refreshTaskSubtasks(projectId, t.id);
     });
     bindCommentDeleteHandlers(projectId, t.id);
     document.getElementById('tm-comment-add').addEventListener('click', ()=>{
@@ -1854,7 +2047,8 @@ function buildContextSummary(){
     p.tasks.forEach(t=>{
       const overdue = isOverdue(t) ? ' [VENCIDA]' : '';
       const commentsInfo = t.comments && t.comments.length ? ` | comentarios: ${t.comments.map(c=>c.text).join(' / ')}` : '';
-      lines.push(`  - ${t.title} | responsable: ${t.responsible||'sin asignar'} | estado: ${statusLabel(t.status)} | inicio: ${t.start} | fin: ${t.end}${overdue}${commentsInfo}`);
+      const subtasksInfo = t.subtasks && t.subtasks.length ? ` | subtareas (${t.subtasks.filter(s=>s.done).length}/${t.subtasks.length}): ${t.subtasks.map(s=>`${s.done?'✓':'☐'} ${s.title}${s.note?` (${s.note})`:''}`).join(', ')}` : '';
+      lines.push(`  - ${t.title} | responsable: ${t.responsible||'sin asignar'} | estado: ${statusLabel(t.status)} | inicio: ${t.start} | fin: ${t.end}${overdue}${subtasksInfo}${commentsInfo}`);
     });
     if(p.tasks.length===0) lines.push('  (sin tareas cargadas)');
   });
@@ -1870,6 +2064,12 @@ function buildContextSummary(){
     const stagnant = isStagnant(b) ? ` [SIN MOVIMIENTO HACE ${daysSince(b.updatedAt)} DÍAS]` : '';
     const subtasksInfo = b.subtasks && b.subtasks.length ? ` | subtareas (${b.subtasks.filter(s=>s.done).length}/${b.subtasks.length}): ${b.subtasks.map(s=>`${s.done?'✓':'☐'} ${s.title}${s.note?` (${s.note})`:''}`).join(', ')}` : '';
     lines.push(`· ${b.title} | responsable: ${b.responsible||'sin asignar'} | área: ${b.area||'-'} | RDA: ${b.rda||'-'} | SOLPED: ${b.solped||'-'} | HES: ${b.hes||'-'} | importe: ${b.importe||'-'} | estado: ${statusLabel(b.status)} | inicio: ${b.start||'-'} | fin: ${b.end||'-'}${overdue}${stagnant}${b.notas?` | notas: ${b.notas}`:''}${subtasksInfo}`);
+  });
+  lines.push('\nTAREAS DIARIAS (pedidos espontáneos, sin relación a proyectos):');
+  const dailyTasks = DATA.dailyTasks || [];
+  if(dailyTasks.length===0) lines.push('  (sin notas cargadas)');
+  dailyTasks.forEach(d=>{
+    lines.push(`· ${d.done?'[HECHO] ':''}${d.text} | anotado: ${fmtDateTime(d.createdAt)}`);
   });
   return lines.join('\n');
 }
@@ -1946,6 +2146,7 @@ document.querySelectorAll('#hoyFilters .chip').forEach(chip=>{
   });
 });
 document.getElementById('hoySearch').addEventListener('input', e=>{ hoySearch = e.target.value; renderHoy(); });
+document.getElementById('projSearch').addEventListener('input', e=>{ projSearch = e.target.value; renderProyectos(); });
 document.getElementById('btSearch').addEventListener('input', e=>{ btSearchTerm = e.target.value; renderBoutique(); });
 document.getElementById('btnQuickAdd').addEventListener('click', openQuickAddModal);
 document.getElementById('btnNewProject').addEventListener('click', ()=> openProjectModal(null));
@@ -1953,12 +2154,25 @@ document.getElementById('btnExport').addEventListener('click', exportExcel);
 document.querySelectorAll('[data-newbt]').forEach(btn=>{
   btn.addEventListener('click', ()=> openBoutiqueModal(btn.dataset.newbt, null));
 });
+function submitDailyTask(){
+  const input = document.getElementById('dailyInput');
+  const val = input.value.trim();
+  if(!val) return;
+  addDailyTask(val);
+  input.value = '';
+  renderDailyTasks();
+}
+document.getElementById('dailyAdd').addEventListener('click', submitDailyTask);
+document.getElementById('dailyInput').addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ e.preventDefault(); submitDailyTask(); }
+});
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
 
 function renderAll(){
   renderHoy();
   renderProyectos();
   renderBoutique();
+  renderDailyTasks();
 }
 
 let appInitialized = false;
