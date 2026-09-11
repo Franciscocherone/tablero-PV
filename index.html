@@ -230,6 +230,9 @@ body{
 .task-table tr:hover td{background:rgba(43,38,30,.025);}
 .task-table tr.row-complete td{background:var(--teal-dim);}
 .task-table tr.row-complete:hover td{background:#d3ecd8;}
+.task-table tr.row-overdue td{background:var(--rose-dim);}
+.task-table tr.row-overdue:hover td{background:#f5c9c3;}
+.cell-overdue{color:var(--rose); font-weight:700;}
 .th-handle{width:22px;}
 .td-handle{
   width:22px; text-align:center; color:var(--text-faint); cursor:grab; font-size:13px;
@@ -929,13 +932,14 @@ function renderProjectsGanttOverview(){
     const done = p.tasks.filter(t=>t.status==='completado').length;
     const pct = total ? Math.round(done/total*100) : 0;
     const hasProgress = p.tasks.some(t=>t.status!=='pendiente');
+    const hasOverdue = p.tasks.some(isOverdue);
     const hex = COLOR_HEX[p.color] || COLOR_HEX.amber;
     return {
       key: p.id,
-      label: `${p.name} — ${pct}%`,
+      label: `${p.name} — ${pct}%${hasOverdue?' ⚠':''}`,
       start: new Date(Math.min(...starts)).toISOString().slice(0,10),
       end: new Date(Math.max(...ends)).toISOString().slice(0,10),
-      barColor: pct===100 ? COLOR_HEX.teal : (hasProgress ? hex : '#D9D2BE')
+      barColor: pct===100 ? COLOR_HEX.teal : (hasOverdue ? COLOR_HEX.rose : (hasProgress ? hex : '#D9D2BE'))
     };
   });
   wrap.innerHTML = computeGanttHTML(rows);
@@ -1000,15 +1004,17 @@ function renderProyectos(){
         <table class="task-table">
           <thead><tr><th class="th-handle"></th><th>Tarea</th><th>Responsable</th><th>Inicio</th><th>Fin</th><th>Estado</th></tr></thead>
           <tbody>
-            ${tasksForView.length ? tasksForView.map(t=>`
-              <tr data-task="${t.id}" data-project="${p.id}" class="${t.status==='completado'?'row-complete':''}" draggable="${search?'false':'true'}">
+            ${tasksForView.length ? tasksForView.map(t=>{
+              const overdue = isOverdue(t);
+              return `
+              <tr data-task="${t.id}" data-project="${p.id}" class="${t.status==='completado'?'row-complete':(overdue?'row-overdue':'')}" draggable="${search?'false':'true'}">
                 <td class="td-handle" title="Arrastrá para reordenar">⠿</td>
                 <td>${escapeHTML(t.title)}${t.subtasks && t.subtasks.length ? ` <span class="badge-count" title="Subtareas completadas">☑ ${t.subtasks.filter(s=>s.done).length}/${t.subtasks.length}</span>` : ''}${t.comments && t.comments.length ? ` <span class="badge-count" title="${t.comments.length} comentario(s)">💬 ${t.comments.length}</span>` : ''}</td>
                 <td>${escapeHTML(t.responsible||'—')}</td>
                 <td>${fmtDate(t.start)}</td>
-                <td>${fmtDate(t.end)}</td>
+                <td class="${overdue?'cell-overdue':''}">${fmtDate(t.end)}${overdue?' ⚠':''}</td>
                 <td><span class="status-pill ${t.status}">${statusLabel(t.status)}</span></td>
-              </tr>`).join('') : `<tr><td colspan="6" style="color:var(--text-faint); text-align:center; padding:14px;">Sin tareas todavía</td></tr>`}
+              </tr>`;}).join('') : `<tr><td colspan="6" style="color:var(--text-faint); text-align:center; padding:14px;">Sin tareas todavía</td></tr>`}
           </tbody>
         </table>
         <div class="add-project-row" style="justify-content:flex-start; margin-top:12px;">
@@ -1181,7 +1187,7 @@ function ganttHTML(p, tasks){
     label: t.title,
     start: t.start||todayISO(),
     end: t.end||t.start||todayISO(),
-    barColor: t.status==='completado' ? COLOR_HEX.teal : (t.status==='progreso'? hex : '#D9D2BE')
+    barColor: t.status==='completado' ? COLOR_HEX.teal : (isOverdue(t) ? COLOR_HEX.rose : (t.status==='progreso'? hex : '#D9D2BE'))
   }));
   return computeGanttHTML(rows);
 }
