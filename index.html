@@ -232,6 +232,8 @@ body{
 .task-table tr.row-complete:hover td{background:#d3ecd8;}
 .task-table tr.row-overdue td{background:var(--rose-dim);}
 .task-table tr.row-overdue:hover td{background:#f5c9c3;}
+.task-table tr.row-pending td{background:var(--panel-2);}
+.task-table tr.row-pending:hover td{background:var(--panel-3);}
 .cell-overdue{color:var(--rose); font-weight:700;}
 .th-handle{width:22px;}
 .td-handle{
@@ -1007,7 +1009,7 @@ function renderProyectos(){
             ${tasksForView.length ? tasksForView.map(t=>{
               const overdue = isOverdue(t);
               return `
-              <tr data-task="${t.id}" data-project="${p.id}" class="${t.status==='completado'?'row-complete':(overdue?'row-overdue':'')}" draggable="${search?'false':'true'}">
+              <tr data-task="${t.id}" data-project="${p.id}" class="${t.status==='completado'?'row-complete':(overdue?'row-overdue':(t.status==='pendiente'?'row-pending':''))}" draggable="${search?'false':'true'}">
                 <td class="td-handle" title="Arrastrá para reordenar">⠿</td>
                 <td>${escapeHTML(t.title)}${t.subtasks && t.subtasks.length ? ` <span class="badge-count" title="Subtareas completadas">☑ ${t.subtasks.filter(s=>s.done).length}/${t.subtasks.length}</span>` : ''}${t.comments && t.comments.length ? ` <span class="badge-count" title="${t.comments.length} comentario(s)">💬 ${t.comments.length}</span>` : ''}</td>
                 <td>${escapeHTML(t.responsible||'—')}</td>
