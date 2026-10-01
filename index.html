@@ -437,6 +437,15 @@ body{
   </div>
 </div>
 
+<div class="login-screen hidden" id="loadErrorScreen">
+  <div class="login-card">
+    <div style="font-size:34px; margin-bottom:10px;">⚠️</div>
+    <h1>No se pudo cargar el tablero</h1>
+    <p>Hubo un problema de conexión con el servidor. Tus datos están a salvo — no se modificó ni se sobrescribió nada. Probá de nuevo en unos segundos.</p>
+    <button class="btn btn-primary login-submit" id="loadErrorRetry">Reintentar</button>
+  </div>
+</div>
+
 <div id="app" class="hidden">
 
   <div class="topbar">
@@ -729,13 +738,14 @@ function shiftDate(days){
 const API_ENDPOINT = '/api/data';
 
 async function loadData(){
-  try{
-    const res = await fetch(API_ENDPOINT);
-    if(res.ok){
-      const value = await res.json();
-      if(value){ DATA = value; migrateData(); return; }
-    }
-  }catch(e){ console.error('Load error', e); }
+  // IMPORTANT: never fall back to seedData() on a network/server error — that would
+  // silently overwrite real production data the moment Supabase is unreachable
+  // (e.g. a paused free-tier project). Seeding only happens when the server
+  // responds successfully and genuinely has no row saved yet (brand new setup).
+  const res = await fetch(API_ENDPOINT);
+  if(!res.ok) throw new Error('No se pudo cargar (HTTP '+res.status+')');
+  const value = await res.json();
+  if(value){ DATA = value; migrateData(); return; }
   DATA = seedData();
   migrateData();
   await saveData();
@@ -762,15 +772,24 @@ function migrateData(){
   });
 }
 let saveTimer=null;
-async function saveData(){
+async function saveData(retryCount){
+  retryCount = retryCount || 0;
   try{
     const res = await fetch(API_ENDPOINT, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify(DATA)
     });
-    if(!res.ok) throw new Error('save failed');
-  }catch(e){ console.error('Storage error', e); showToast('No se pudo guardar. Reintentando…'); }
+    if(!res.ok) throw new Error('save failed: HTTP '+res.status);
+  }catch(e){
+    console.error('Storage error', e);
+    if(retryCount < 3){
+      showToast('No se pudo guardar. Reintentando…');
+      setTimeout(()=> saveData(retryCount+1), 2000 * (retryCount+1));
+    } else {
+      showToast('⚠ No se pudo guardar el último cambio. Revisá tu conexión y no cierres esta pestaña.');
+    }
+  }
 }
 function scheduleSave(){
   clearTimeout(saveTimer);
@@ -2188,9 +2207,21 @@ async function initApp(){
   if(appInitialized) return;
   appInitialized = true;
   document.getElementById('todayLabel').textContent = new Date().toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'long'});
-  await loadData();
+  try{
+    await loadData();
+  }catch(e){
+    console.error('Init error', e);
+    appInitialized = false;
+    document.getElementById('app').classList.add('hidden');
+    document.getElementById('loadErrorScreen').classList.remove('hidden');
+    return;
+  }
   renderAll();
 }
+document.getElementById('loadErrorRetry').addEventListener('click', ()=>{
+  document.getElementById('loadErrorScreen').classList.add('hidden');
+  initApp();
+});
 
 if(isAuthed()){ showApp(); initApp(); } else { showLogin(); document.getElementById('login-user').focus(); }
 </script>
